@@ -1,0 +1,9 @@
+random_state: 42
+test_size: 0.20
+validation_size: 0.20
+thresholds:
+  approve_max_risk: 0.20
+  decline_min_risk: 0.45
+  max_missing_fraction: 0.10
+  out_of_distribution_z: 5.0
+
