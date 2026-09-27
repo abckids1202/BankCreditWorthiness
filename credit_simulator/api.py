@@ -208,7 +208,7 @@ def _artifacts():
     try:
         model = joblib.load(model_path)
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        required = {"model_version", "feature_names", "thresholds", "score", "risk_bands", "model_sha256"}
+        required = {"model_version", "policy_version", "artifact_fingerprint", "training_config_sha256", "feature_names", "raw_feature_names", "thresholds", "score", "risk_bands", "feature_stats", "disclaimer", "model_sha256"}
         checksum = hashlib.sha256(model_path.read_bytes()).hexdigest()
         if not isinstance(metadata, dict) or not required.issubset(metadata) or metadata["model_sha256"] != checksum or not hasattr(model, "predict_proba"):
             raise ValueError("missing required model metadata or prediction interface")

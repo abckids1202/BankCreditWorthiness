@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import json
 import pytest
 
 import credit_simulator.api as api
@@ -57,6 +58,18 @@ def test_ready_endpoint_reports_checksum_mismatch(monkeypatch, tmp_path):
     shutil.copyfile(source_metadata, tmp_path / "metadata.json")
     with (tmp_path / "model.joblib").open("ab") as handle:
         handle.write(b"tampered")
+    monkeypatch.setattr(api, "ARTIFACT_DIR", tmp_path)
+    response = TestClient(app).get("/ready")
+    assert response.status_code == 503
+
+
+def test_ready_endpoint_reports_incomplete_manifest(monkeypatch, tmp_path):
+    source_model = api.ARTIFACT_DIR / "model.joblib"
+    source_metadata = api.ARTIFACT_DIR / "metadata.json"
+    shutil.copyfile(source_model, tmp_path / "model.joblib")
+    metadata = json.loads(source_metadata.read_text(encoding="utf-8"))
+    metadata.pop("training_config_sha256", None)
+    (tmp_path / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     monkeypatch.setattr(api, "ARTIFACT_DIR", tmp_path)
     response = TestClient(app).get("/ready")
     assert response.status_code == 503
