@@ -88,6 +88,16 @@ def _feature_summary(frame: pd.DataFrame, features: list[str]) -> dict[str, dict
     return summary
 
 
+def _split_id_overlap(train_frame: pd.DataFrame, validation_frame: pd.DataFrame, test_frame: pd.DataFrame, id_column: str | None) -> dict[str, int]:
+    """Count duplicate applicant IDs across splits without treating missing IDs as matches."""
+    if not id_column:
+        return {"train_validation": 0, "train_test": 0, "validation_test": 0}
+    if any(id_column not in frame.columns for frame in (train_frame, validation_frame, test_frame)):
+        raise ValueError(f"Declared id_column is missing from one or more split frames: {id_column}")
+    identifiers = [set(frame[id_column].dropna().tolist()) for frame in (train_frame, validation_frame, test_frame)]
+    return {"train_validation": len(identifiers[0] & identifiers[1]), "train_test": len(identifiers[0] & identifiers[2]), "validation_test": len(identifiers[1] & identifiers[2])}
+
+
 def train_tabular(bundle: DatasetBundle, output_dir: str | Path, random_state: int = 42) -> dict:
     """Train a schema-agnostic calibrated model for alternate dataset adapters.
 
@@ -129,6 +139,10 @@ def train_tabular(bundle: DatasetBundle, output_dir: str | Path, random_state: i
         X_train, X_valid, y_train, y_valid = train_test_split(X_development, y_development, test_size=0.25, stratify=y_development, random_state=random_state)
         split_strategy = "stratified_random"
         validation_rows = int(len(X_valid))
+    id_column = bundle.metadata.get("id_column")
+    split_overlap = _split_id_overlap(bundle.frame.loc[X_train.index], bundle.frame.loc[X_valid.index], bundle.frame.loc[X_test.index], id_column)
+    if any(split_overlap.values()):
+        raise ValueError(f"Applicant IDs overlap across train/validation/test splits: {split_overlap}")
     started = time.perf_counter(); training_timestamp = datetime.now(timezone.utc).isoformat(); model.fit(X_train, y_train); validation_probabilities = model.predict_proba(X_valid)[:, 1]; probabilities = model.predict_proba(X_test)[:, 1]
     dataset_hash = hashlib.sha256(bundle.frame.to_csv(index=False).encode("utf-8")).hexdigest()
     fingerprint_payload = json.dumps({"dataset_sha256": dataset_hash, "dataset": bundle.name, "target": bundle.target, "features": features, "random_state": random_state}, sort_keys=True).encode("utf-8")
@@ -147,15 +161,14 @@ def train_tabular(bundle: DatasetBundle, output_dir: str | Path, random_state: i
     else:
         random_split_metrics = metrics_test
         split_comparison = {"random_split": random_split_metrics, "temporal_split": None, "serving_split": "stratified_random"}
-    id_column = bundle.metadata.get("id_column")
-    data_quality = {"rows": int(len(bundle.frame)), "columns": int(len(bundle.frame.columns)), "missing_by_column": {str(key): float(value) for key, value in bundle.frame.isna().mean().items()}, "feature_dtypes": {str(key): str(value) for key, value in X.dtypes.items()}, "duplicate_rows": int(bundle.frame.duplicated().sum()), "duplicate_id_rows": int(bundle.frame[id_column].duplicated().sum()) if id_column in bundle.frame.columns else None, "id_column": id_column, "constant_columns": [str(column) for column in bundle.frame.columns if bundle.frame[column].nunique(dropna=False) <= 1], "target_values": sorted(int(value) for value in y.unique()), "target_outside_binary_count": int((~bundle.frame[bundle.target].isin([0, 1])).sum())}
+    data_quality = {"rows": int(len(bundle.frame)), "columns": int(len(bundle.frame.columns)), "missing_by_column": {str(key): float(value) for key, value in bundle.frame.isna().mean().items()}, "feature_dtypes": {str(key): str(value) for key, value in X.dtypes.items()}, "duplicate_rows": int(bundle.frame.duplicated().sum()), "duplicate_id_rows": int(bundle.frame[id_column].duplicated().sum()) if id_column in bundle.frame.columns else None, "id_column": id_column, "split_overlap": split_overlap, "constant_columns": [str(column) for column in bundle.frame.columns if bundle.frame[column].nunique(dropna=False) <= 1], "target_values": sorted(int(value) for value in y.unique()), "target_outside_binary_count": int((~bundle.frame[bundle.target].isin([0, 1])).sum())}
     feature_summary = _feature_summary(bundle.frame, features)
     calibration = _calibration_report(y_test, probabilities)
     threshold_analysis = _threshold_report(y_test, probabilities)
     audit_frame = bundle.frame.loc[X_test.index]
     audit_columns = [column for column in bundle.protected_attributes if column in audit_frame.columns]
     fairness = group_metrics(audit_frame, y_test.to_numpy(), probabilities, audit_columns) if audit_columns else {}
-    dataset_summary = {"name": bundle.name, "source_url": bundle.metadata.get("source_url"), "license": bundle.metadata.get("license"), "target_name": bundle.target, "target_definition": bundle.metadata.get("target_definition", bundle.target), "row_definition": bundle.metadata.get("row_definition"), "positive_class": int(y.sum()), "negative_class": int((1 - y).sum()), "default_rate": float(y.mean()), "train_rows": int(len(X_train)), "validation_rows": validation_rows, "test_rows": int(len(X_test)), "random_state": int(random_state), "split_strategy": split_strategy, "dataset_sha256": dataset_hash}
+    dataset_summary = {"name": bundle.name, "source_url": bundle.metadata.get("source_url"), "license": bundle.metadata.get("license"), "target_name": bundle.target, "target_definition": bundle.metadata.get("target_definition", bundle.target), "row_definition": bundle.metadata.get("row_definition"), "positive_class": int(y.sum()), "negative_class": int((1 - y).sum()), "default_rate": float(y.mean()), "train_rows": int(len(X_train)), "validation_rows": validation_rows, "test_rows": int(len(X_test)), "random_state": int(random_state), "split_strategy": split_strategy, "split_overlap": split_overlap, "dataset_sha256": dataset_hash}
     runtime = {"python": sys.version.split()[0], "platform": platform.platform(), "numpy": np.__version__, "pandas": pd.__version__, "scikit_learn": sklearn.__version__, "joblib": joblib.__version__}
     metadata = {"schema_version": "1.0", "experiment_id": experiment_id, "model_version": f"0.2.0+{artifact_fingerprint}", "policy_version": "alternate-experiment-0.1.0", "artifact_fingerprint": artifact_fingerprint, "training_config_sha256": training_config_sha256, "runtime": runtime, "dataset_sha256": dataset_hash, "dataset": bundle.name, "target": bundle.target, "feature_names": features, "protected_attributes": bundle.protected_attributes, "numeric_features": numeric, "categorical_features": categorical, "feature_schema": {str(column): str(bundle.frame[column].dtype) for column in features}, "metrics_validation": metrics_validation, "metrics_test": metrics_test, "random_split_metrics": random_split_metrics, "split_comparison": split_comparison, "dataset_summary": dataset_summary, "data_quality": data_quality, "feature_summary": feature_summary, "calibration": calibration, "threshold_analysis": threshold_analysis, "fairness": fairness, "training_rows": int(len(X_train)), "validation_rows": validation_rows, "test_rows": int(len(X_test)), "split_strategy": split_strategy, "training_timestamp": training_timestamp, "training_seconds": time.perf_counter() - started, "source_metadata": bundle.metadata, "disclaimer": "Educational experiment; not for real lending decisions."}
     report = {"experiment_id": experiment_id, "dataset_summary": dataset_summary, "data_quality": data_quality, "feature_summary": feature_summary, "feature_names": features, "metrics_validation": metrics_validation, "metrics_test": metrics_test, "random_split_metrics": random_split_metrics, "split_comparison": split_comparison, "calibration": calibration, "threshold_analysis": threshold_analysis, "fairness": fairness, "training_timestamp": training_timestamp, "model_version": metadata["model_version"], "policy_version": metadata["policy_version"], "source_metadata": bundle.metadata}

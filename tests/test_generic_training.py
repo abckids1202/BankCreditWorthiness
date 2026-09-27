@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from credit_simulator.datasets import DatasetBundle
-from credit_simulator.generic_training import train_tabular
+from credit_simulator.generic_training import _split_id_overlap, train_tabular
 
 
 def test_generic_trainer_handles_mixed_schema(tmp_path):
@@ -69,3 +69,10 @@ def test_generic_trainer_uses_temporal_split_when_adapter_declares_time_column(t
     assert metadata["metrics_validation"]["roc_auc"] >= 0
     assert metadata["split_comparison"]["serving_split"] == "temporal"
     assert metadata["split_comparison"]["random_split"]["roc_auc"] >= 0
+
+
+def test_split_id_overlap_reports_cross_split_duplicates_and_ignores_missing_ids():
+    train = pd.DataFrame({"application_id": [1, 2, None]})
+    validation = pd.DataFrame({"application_id": [2, 3, None]})
+    test = pd.DataFrame({"application_id": [4, 1, None]})
+    assert _split_id_overlap(train, validation, test, "application_id") == {"train_validation": 1, "train_test": 1, "validation_test": 0}
