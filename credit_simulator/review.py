@@ -14,10 +14,14 @@ class ReviewStore:
         with self._connect() as connection:
             connection.execute("""CREATE TABLE IF NOT EXISTS review_cases (
                 case_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-                applicant_json TEXT NOT NULL, model_version TEXT NOT NULL, risk_probability REAL NOT NULL,
+                applicant_json TEXT NOT NULL, model_version TEXT NOT NULL, policy_version TEXT NOT NULL DEFAULT 'unknown',
+                risk_probability REAL NOT NULL,
                 credit_score INTEGER NOT NULL, automatic_decision TEXT NOT NULL, reason_codes_json TEXT NOT NULL,
                 warnings_json TEXT NOT NULL, reviewer_decision TEXT, reviewer_note TEXT, reviewed_at TEXT
             )""")
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(review_cases)").fetchall()}
+            if "policy_version" not in columns:
+                connection.execute("ALTER TABLE review_cases ADD COLUMN policy_version TEXT NOT NULL DEFAULT 'unknown'")
 
     def _connect(self):
         connection = sqlite3.connect(self.path)
@@ -35,7 +39,19 @@ class ReviewStore:
         now = datetime.now(timezone.utc).isoformat()
         case_id = str(uuid.uuid4())
         with self._connect() as connection:
-            connection.execute("INSERT INTO review_cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (case_id, now, now, json.dumps(applicant), prediction["model_version"], prediction["risk_probability"], prediction["credit_score"], prediction["decision"], json.dumps(prediction["reason_codes"]), json.dumps(prediction.get("warnings", [])), None, None, None))
+            connection.execute(
+                """INSERT INTO review_cases (
+                    case_id, created_at, updated_at, applicant_json, model_version, policy_version,
+                    risk_probability, credit_score, automatic_decision, reason_codes_json,
+                    warnings_json, reviewer_decision, reviewer_note, reviewed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    case_id, now, now, json.dumps(applicant), prediction["model_version"],
+                    prediction.get("policy_version", "unknown"), prediction["risk_probability"],
+                    prediction["credit_score"], prediction["decision"], json.dumps(prediction["reason_codes"]),
+                    json.dumps(prediction.get("warnings", [])), None, None, None,
+                ),
+            )
         return self.get(case_id)
 
     def get(self, case_id: str) -> dict | None:

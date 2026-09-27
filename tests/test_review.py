@@ -5,11 +5,29 @@ import pytest
 
 def test_review_case_preserves_model_decision(tmp_path):
     store = ReviewStore(tmp_path / "reviews.db")
-    case = store.create({"LIMIT_BAL": 1000}, {"model_version": "test", "risk_probability": 0.3, "credit_score": 600, "decision": "manual_review", "reason_codes": ["test"], "warnings": []})
+    case = store.create({"LIMIT_BAL": 1000}, {"model_version": "test", "policy_version": "policy-0.1.0", "risk_probability": 0.3, "credit_score": 600, "decision": "manual_review", "reason_codes": ["test"], "warnings": []})
     assert case["automatic_decision"] == "manual_review"
+    assert case["policy_version"] == "policy-0.1.0"
     updated = store.update(case["case_id"], "approved", "Reviewed for prototype")
     assert updated["automatic_decision"] == "manual_review"
     assert updated["reviewer_decision"] == "approved"
+
+
+def test_review_store_migrates_existing_schema(tmp_path):
+    import sqlite3
+
+    database = tmp_path / "legacy_reviews.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("""CREATE TABLE review_cases (
+            case_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            applicant_json TEXT NOT NULL, model_version TEXT NOT NULL, risk_probability REAL NOT NULL,
+            credit_score INTEGER NOT NULL, automatic_decision TEXT NOT NULL, reason_codes_json TEXT NOT NULL,
+            warnings_json TEXT NOT NULL, reviewer_decision TEXT, reviewer_note TEXT, reviewed_at TEXT
+        )""")
+
+    store = ReviewStore(database)
+    case = store.create({"LIMIT_BAL": 1000}, {"model_version": "legacy-compatible", "risk_probability": 0.2, "credit_score": 650, "decision": "approve", "reason_codes": [], "warnings": []})
+    assert case["policy_version"] == "unknown"
 
 
 def test_review_update_schema_rejects_unknown_decision():
