@@ -102,6 +102,7 @@ class Prediction(BaseModel):
     reason_codes: list[str]
     explanations: list[dict]
     warnings: list[str]
+    fairness_warnings: list[str] = []
     educational_disclaimer: str
 
 
@@ -373,8 +374,11 @@ def predict(applicant: Applicant, request: Request):
         warnings.append("Input is outside the training distribution and was routed to review")
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
     score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
+    fairness_warnings = [
+        "Protected attributes are excluded from individual scoring; group fairness must be evaluated with audit data"
+    ]
     prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None), metadata.get("policy_version", "unknown"), _dataset_version(metadata))
-    return Prediction(risk_probability=probability, default_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], dataset_version=_dataset_version(metadata), policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+    return Prediction(risk_probability=probability, default_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], dataset_version=_dataset_version(metadata), policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, fairness_warnings=fairness_warnings, educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/predict/batch", response_model=BatchPredictionResponse)

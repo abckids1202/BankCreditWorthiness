@@ -94,6 +94,7 @@ def test_batch_prediction_endpoint():
     assert response.json()["predictions"][0]["policy_version"] == "policy-0.1.0"
     assert len(response.json()["predictions"][0]["dataset_version"]) == 64
     assert response.json()["predictions"][0]["default_probability"] == response.json()["predictions"][0]["risk_probability"]
+    assert response.json()["predictions"][0]["fairness_warnings"]
 
 
 def test_out_of_distribution_input_is_reviewed():
