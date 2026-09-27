@@ -124,6 +124,43 @@ class DatasetPrediction(BaseModel):
     educational_disclaimer: str
 
 
+ReviewerDecision = Literal["approved", "declined", "needs_more_information", "escalated"]
+
+
+class ReviewCase(BaseModel):
+    case_id: str
+    created_at: str
+    updated_at: str
+    applicant: dict[str, Any]
+    model_version: str
+    policy_version: str
+    decision_thresholds: dict[str, float]
+    risk_probability: float
+    credit_score: int
+    automatic_decision: Literal["approve", "manual_review", "decline"]
+    reason_codes: list[str]
+    warnings: list[str]
+    reviewer_decision: ReviewerDecision | None = None
+    reviewer_note: str | None = None
+    reviewer_id: str | None = None
+    reviewed_at: str | None = None
+
+
+class ReviewHistoryEvent(BaseModel):
+    event_id: str
+    case_id: str
+    event_type: Literal["created", "updated"]
+    created_at: str
+    reviewer_decision: ReviewerDecision | None = None
+    reviewer_note: str | None = None
+    reviewer_id: str | None = None
+
+
+class ReviewHistoryResponse(BaseModel):
+    case_id: str
+    events: list[ReviewHistoryEvent]
+
+
 class ThresholdSimulationRequest(BaseModel):
     probabilities: list[float] = Field(min_length=1, max_length=100000)
     approve_max_risk: float = Field(ge=0, le=1)
@@ -266,7 +303,7 @@ def predict_alternate(dataset: str, request: DatasetPredictionRequest, http_requ
     return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], policy_version=policy_version, warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
 
 
-@app.post("/review-cases")
+@app.post("/review-cases", response_model=ReviewCase)
 def create_review_case(applicant: Applicant, request: Request):
     prediction_result = predict(applicant, request)
     if prediction_result.decision != "manual_review":
@@ -275,12 +312,12 @@ def create_review_case(applicant: Applicant, request: Request):
     return review_store.create(applicant.model_dump(), prediction)
 
 
-@app.get("/review-cases")
+@app.get("/review-cases", response_model=list[ReviewCase])
 def list_review_cases(limit: int = 50):
     return review_store.list(limit)
 
 
-@app.get("/review-cases/{case_id}")
+@app.get("/review-cases/{case_id}", response_model=ReviewCase)
 def get_review_case(case_id: str):
     case = review_store.get(case_id)
     if not case:
@@ -288,7 +325,7 @@ def get_review_case(case_id: str):
     return case
 
 
-@app.get("/review-cases/{case_id}/history")
+@app.get("/review-cases/{case_id}/history", response_model=ReviewHistoryResponse)
 def get_review_case_history(case_id: str):
     history = review_store.history(case_id)
     if history is None:
@@ -297,12 +334,12 @@ def get_review_case_history(case_id: str):
 
 
 class ReviewUpdate(BaseModel):
-    reviewer_decision: Literal["approved", "declined", "needs_more_information", "escalated"] | None = None
+    reviewer_decision: ReviewerDecision | None = None
     reviewer_note: str | None = Field(default=None, max_length=5000)
     reviewer_id: str | None = Field(default=None, min_length=1, max_length=100)
 
 
-@app.patch("/review-cases/{case_id}")
+@app.patch("/review-cases/{case_id}", response_model=ReviewCase)
 def update_review_case(case_id: str, update: ReviewUpdate):
     try:
         case = review_store.update(case_id, update.reviewer_decision, update.reviewer_note, update.reviewer_id)

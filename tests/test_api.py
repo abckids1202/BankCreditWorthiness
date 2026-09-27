@@ -145,3 +145,9 @@ def test_review_history_endpoint(monkeypatch, tmp_path):
     assert updated.status_code == 200
     assert len(client.get(f"/review-cases/{case_id}/history").json()["events"]) == 2
 
+
+def test_review_openapi_declares_typed_case_responses():
+    schema = TestClient(app).get("/openapi.json").json()
+    assert "ReviewCase" in schema["components"]["schemas"]
+    assert schema["paths"]["/review-cases"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["type"] == "array"
+
