@@ -73,6 +73,8 @@ The API also exposes `GET /ready` for artifact readiness separately from `GET /h
 
 For non-local use, set `CREDIT_API_KEY` in the service environment. Protected endpoints then require the matching `X-API-Key` header. Health, readiness, and API documentation routes remain public for operational checks. Leave the variable unset for the default local-development workflow.
 
+An optional in-memory limiter can be enabled with `CREDIT_RATE_LIMIT_PER_MINUTE=60`. It limits non-public routes per API key (or client address when no key is configured), returns HTTP 429 with `Retry-After`, and leaves health/readiness/docs routes available for operational checks. This is suitable for local demonstrations only; distributed production deployments need a shared, persistent limiter.
+
 Every training run registers its artifact metadata in the local generated `artifacts/model_registry.json`. Use `GET /models` to inspect available dataset/model versions and test metrics. The registry is local experiment metadata and is intentionally not committed with generated model files.
 
 Prediction events are logged to a local generated SQLite database without storing raw applicant inputs. Use `GET /prediction-stats` for aggregate counts by dataset, model version, and automatic decision. This is intended for educational observability and should be replaced with a governed retention system before any real deployment.

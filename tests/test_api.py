@@ -59,6 +59,18 @@ def test_optional_api_key(monkeypatch):
     assert client.get("/model-info", headers={"X-API-Key": "test-secret"}).status_code == 200
 
 
+def test_optional_rate_limit(monkeypatch):
+    monkeypatch.setenv("CREDIT_RATE_LIMIT_PER_MINUTE", "1")
+    from credit_simulator.api import rate_limiter
+    rate_limiter.clear()
+    client = TestClient(app)
+    assert client.get("/model-info").status_code == 200
+    limited = client.get("/model-info")
+    assert limited.status_code == 429
+    assert limited.headers.get("Retry-After")
+    rate_limiter.clear()
+
+
 def test_unknown_alternate_dataset_is_rejected():
     response = TestClient(app).post("/predict/not_a_dataset", json={"features": {}})
     assert response.status_code == 404

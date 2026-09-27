@@ -24,11 +24,13 @@ from .datasets import ADAPTERS
 from .monitoring import drift_report
 from .registry import list_models
 from .predictions import PredictionEventStore
+from .rate_limit import RateLimiter
 
 
 ARTIFACT_DIR = Path("artifacts")
 review_store = ReviewStore()
 prediction_store = PredictionEventStore()
+rate_limiter = RateLimiter()
 app = FastAPI(title="Explainable Credit Approval Simulator", version="0.1.0", description="Educational prototype only; not for real lending decisions.")
 logger = logging.getLogger("credit_simulator.api")
 
@@ -43,7 +45,23 @@ async def request_context(request, call_next):
     if configured_key and request.url.path not in public_paths and request.headers.get("X-API-Key") != configured_key:
         response = JSONResponse(status_code=401, content={"detail": "Missing or invalid X-API-Key"})
     else:
-        response = await call_next(request)
+        rate_limit_raw = os.getenv("CREDIT_RATE_LIMIT_PER_MINUTE")
+        if rate_limit_raw and request.url.path not in public_paths:
+            try:
+                rate_limit = int(rate_limit_raw)
+                if rate_limit <= 0:
+                    raise ValueError
+            except ValueError:
+                response = JSONResponse(status_code=500, content={"detail": "CREDIT_RATE_LIMIT_PER_MINUTE must be a positive integer"})
+            else:
+                key = request.headers.get("X-API-Key") or (request.client.host if request.client else "unknown")
+                allowed, retry_after = rate_limiter.check(key, rate_limit)
+                if not allowed:
+                    response = JSONResponse(status_code=429, content={"detail": "Rate limit exceeded; retry later"}, headers={"Retry-After": str(retry_after), "X-RateLimit-Limit": str(rate_limit)})
+                else:
+                    response = await call_next(request)
+        else:
+            response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.2f", request_id, request.method, request.url.path, response.status_code, (time.perf_counter() - started) * 1000)
     return response
