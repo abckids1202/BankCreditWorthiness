@@ -1,6 +1,6 @@
 import pytest
 
-from credit_simulator.training import _approval_rate_report, _bootstrap_intervals
+from credit_simulator.training import _approval_rate_report, _bootstrap_intervals, _candidate_specs
 
 
 def test_approval_rate_report_measures_defaults_not_approved():
@@ -25,3 +25,15 @@ def test_bootstrap_intervals_are_reproducible_and_bounded():
     assert first == second
     assert first["successful_samples"] > 0
     assert 0 <= first["metrics"]["roc_auc"]["lower_95"] <= first["metrics"]["roc_auc"]["upper_95"] <= 1
+
+
+def test_candidate_specs_cover_baseline_families_and_calibration_variants():
+    specs = _candidate_specs()
+    names = {spec["name"] for spec in specs}
+    assert names == {
+        "logistic_regression_uncalibrated",
+        "logistic_regression_calibrated",
+        "gradient_boosting_uncalibrated",
+        "gradient_boosting_calibrated",
+    }
+    assert sum(bool(spec["calibrated"]) for spec in specs) == 2

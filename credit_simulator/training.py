@@ -161,13 +161,24 @@ def _plots(frame, y, probabilities, reports, threshold_rows=None, features=None,
         axis.set(xlabel="Decline threshold", ylabel="Population rate", title="Decision population by threshold"); axis.set_ylim(0, 1); axis.legend(); figure.tight_layout(); figure.savefig(reports / "threshold_comparison.png", dpi=140); plt.close(figure)
 
 
-def _pipeline(kind: str, random_state: int):
+def _pipeline(kind: str, random_state: int, calibrated: bool = True):
     if kind == "logistic_regression":
         base = LogisticRegression(max_iter=1500, class_weight="balanced", random_state=random_state)
-        estimator = CalibratedClassifierCV(estimator=base, method="sigmoid", cv=3)
+        estimator = CalibratedClassifierCV(estimator=base, method="sigmoid", cv=3) if calibrated else base
         return Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler()), ("model", estimator)])
     base = HistGradientBoostingClassifier(max_iter=250, learning_rate=0.06, max_leaf_nodes=15, random_state=random_state)
-    return Pipeline([("imputer", SimpleImputer(strategy="median")), ("model", CalibratedClassifierCV(estimator=base, method="sigmoid", cv=3))])
+    estimator = CalibratedClassifierCV(estimator=base, method="sigmoid", cv=3) if calibrated else base
+    return Pipeline([("imputer", SimpleImputer(strategy="median")), ("model", estimator)])
+
+
+def _candidate_specs() -> list[dict[str, object]]:
+    """Return the model families reported by every primary training run."""
+    return [
+        {"name": "logistic_regression_uncalibrated", "family": "logistic_regression", "calibrated": False},
+        {"name": "logistic_regression_calibrated", "family": "logistic_regression", "calibrated": True},
+        {"name": "gradient_boosting_uncalibrated", "family": "gradient_boosting", "calibrated": False},
+        {"name": "gradient_boosting_calibrated", "family": "gradient_boosting", "calibrated": True},
+    ]
 
 
 def _fairness(frame: pd.DataFrame, y_true: np.ndarray, probabilities: np.ndarray, protected: list[str]) -> dict:
@@ -213,15 +224,24 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     X_train, X_temp, y_train, y_temp, frame_train, frame_temp = train_test_split(X, y, frame, test_size=config["test_size"] + config["validation_size"], stratify=y, random_state=config["random_state"])
     relative_test = config["test_size"] / (config["test_size"] + config["validation_size"])
     X_valid, X_test, y_valid, y_test, frame_valid, frame_test = train_test_split(X_temp, y_temp, frame_temp, test_size=relative_test, stratify=y_temp, random_state=config["random_state"])
-    metrics = {"majority_baseline": _metrics(y_valid, np.full(len(y_valid), float(y_train.mean())))}
+    baseline_probabilities = np.full(len(y_valid), float(y_train.mean()))
+    metrics = {"majority_baseline": {**_metrics(y_valid, baseline_probabilities), "model_family": "majority_baseline", "calibrated": False, "training_seconds": 0.0, "inference_seconds": 0.0}}
     candidates = {}
-    for name in ("logistic_regression", "gradient_boosting"):
-        model = _pipeline(name, config["random_state"])
+    for specification in _candidate_specs():
+        name = str(specification["name"])
+        family = str(specification["family"])
+        calibrated = bool(specification["calibrated"])
+        model = _pipeline(family, config["random_state"], calibrated=calibrated)
+        fit_started = time.perf_counter()
         model.fit(X_train, y_train)
+        training_seconds = time.perf_counter() - fit_started
+        inference_started = time.perf_counter()
         probabilities = model.predict_proba(X_valid)[:, 1]
-        metrics[name] = _metrics(y_valid, probabilities)
+        inference_seconds = time.perf_counter() - inference_started
+        metrics[name] = {**_metrics(y_valid, probabilities), "model_family": family, "calibrated": calibrated, "training_seconds": float(training_seconds), "inference_seconds": float(inference_seconds), "inference_seconds_per_row": float(inference_seconds / max(len(X_valid), 1))}
         candidates[name] = model
-    selected_name = max(candidates, key=lambda name: (metrics[name]["pr_auc"], -metrics[name]["brier_score"]))
+    calibrated_candidates = [name for name in candidates if metrics[name]["calibrated"]]
+    selected_name = max(calibrated_candidates, key=lambda name: (metrics[name]["pr_auc"], -metrics[name]["brier_score"]))
     selected = candidates[selected_name]
     test_probabilities = selected.predict_proba(X_test)[:, 1]
     test_metrics = _metrics(y_test, test_probabilities)
@@ -255,6 +275,8 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     pd.DataFrame(threshold_rows).to_csv(report_dir / "threshold_analysis.csv", index=False)
     pd.DataFrame(approval_rate_rows).to_csv(report_dir / "approval_rate_analysis.csv", index=False)
+    comparison_rows = [{"model": name, **values} for name, values in metrics.items()]
+    pd.DataFrame(comparison_rows).to_csv(report_dir / "model_comparison.csv", index=False)
     pd.DataFrame(global_importance).to_csv(report_dir / "global_feature_importance.csv", index=False)
     (report_dir / "feature_summary.json").write_text(json.dumps(_data_quality(frame, features), indent=2, default=str), encoding="utf-8")
     (report_dir / "fairness_threshold_sensitivity.json").write_text(json.dumps(fairness_sensitivity, indent=2, default=str), encoding="utf-8")
