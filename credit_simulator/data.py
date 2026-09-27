@@ -5,12 +5,16 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pandas as pd
+import numpy as np
 import requests
 
 
 DATA_URL = "https://archive.ics.uci.edu/static/public/350/default+of+credit+card+clients.zip"
 TARGET = "default"
 PROTECTED = ["SEX", "EDUCATION", "MARRIAGE", "AGE"]
+STATUS_COLUMNS = ["PAY_0", "PAY_2", "PAY_3", "PAY_4", "PAY_5", "PAY_6"]
+BILL_COLUMNS = [f"BILL_AMT{month}" for month in range(1, 7)]
+PAYMENT_COLUMNS = [f"PAY_AMT{month}" for month in range(1, 7)]
 
 
 def _clean_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -49,6 +53,28 @@ def validate_frame(frame: pd.DataFrame) -> None:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
     if frame[TARGET].isna().any() or not set(frame[TARGET].dropna().unique()).issubset({0, 1}):
         raise ValueError("Target must be binary and non-null")
+    domain_errors = []
+    for column, allowed in {"SEX": {1, 2}, "EDUCATION": set(range(0, 7)), "MARRIAGE": set(range(0, 4))}.items():
+        if column in frame and not frame[column].dropna().isin(allowed).all():
+            domain_errors.append(column)
+    for column in STATUS_COLUMNS:
+        if column in frame and not frame[column].dropna().between(-2, 8).all():
+            domain_errors.append(column)
+    if "AGE" in frame and not frame["AGE"].dropna().between(18, 100).all():
+        domain_errors.append("AGE")
+    for column in ["LIMIT_BAL", *BILL_COLUMNS, *PAYMENT_COLUMNS]:
+        if column in frame:
+            numeric = pd.to_numeric(frame[column], errors="coerce")
+            if numeric[frame[column].notna()].isna().any():
+                domain_errors.append(column)
+            if numeric.notna().any() and not np.isfinite(numeric.dropna()).all():
+                domain_errors.append(column)
+            if column == "LIMIT_BAL" and not numeric.dropna().ge(0).all():
+                domain_errors.append(column)
+            if column in PAYMENT_COLUMNS and not numeric.dropna().ge(0).all():
+                domain_errors.append(column)
+    if domain_errors:
+        raise ValueError(f"Feature values are outside the accepted UCI domains: {sorted(set(domain_errors))}")
     if len(frame) < 100:
         raise ValueError("Dataset is too small for a reliable train/test split")
 
