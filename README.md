@@ -89,6 +89,19 @@ The dashboard is organized into tabs for applicant scoring, threshold simulation
 
 After training, use the Swagger UI or send JSON to `POST /predict`. The request contains `LIMIT_BAL`, six repayment-status fields (`PAY_0`, `PAY_2`–`PAY_6`), six bill fields, and six payment fields. The response contains the modeled probability, credit score, risk band, decision thresholds, rationale, model version, structured explanations, reason codes, and warnings.
 
+Copy-paste demo commands using synthetic data:
+
+```powershell
+python scripts/train.py
+uvicorn credit_simulator.api:app --reload
+Invoke-RestMethod http://127.0.0.1:8000/ready
+$body = Get-Content examples/sample_applicant.json -Raw
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/predict -ContentType "application/json" -Body $body
+.\examples\requests.ps1
+```
+
+The same sample payload is available at `examples/sample_applicant.json`; it contains no real personal information.
+
 For repeatable portfolio/demo scoring, `POST /predict/batch` accepts 1–1,000 applicants using the same schema and returns one validated prediction per applicant. Each prediction uses the same model, feature engineering, policy, explanations, and privacy-conscious event logging as single-applicant scoring.
 
 Borderline cases can be persisted for educational human review with `POST /review-cases`, listed with `GET /review-cases`, inspected with `GET /review-cases/{case_id}`, and updated with `PATCH /review-cases/{case_id}`. SQLite stores the original automatic decision separately from the reviewer decision; reviewer outcomes are not allowed to overwrite the model output.
