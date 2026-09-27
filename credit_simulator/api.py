@@ -182,7 +182,7 @@ def health():
 @app.get("/ready")
 def ready():
     _, metadata = _artifacts()
-    return {"status": "ready", "model_version": metadata["model_version"]}
+    return {"status": "ready", "model_version": metadata["model_version"], "policy_version": metadata.get("policy_version", "unknown"), "artifact_fingerprint": metadata.get("artifact_fingerprint", "unknown"), "training_config_sha256": metadata.get("training_config_sha256", "unknown")}
 
 
 @app.post("/policy/simulate")
