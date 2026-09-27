@@ -63,6 +63,8 @@ The training report also includes detailed fairness comparisons by audit group: 
 
 Project governance and design documentation is available in `docs/`: `model_card.md`, `data_card.md`, `decision_policy.md`, `fairness_report.md`, and `architecture.md`. GitHub Actions runs the test suite on pushes and pull requests. Docker API containers expose a health check, and the dashboard waits for the API health check in Compose.
 
+The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.
+
 ## API example
 
 After training, use the Swagger UI or send JSON to `POST /predict`. The request contains `LIMIT_BAL`, six repayment-status fields (`PAY_0`, `PAY_2`–`PAY_6`), six bill fields, and six payment fields. The response contains the modeled probability, credit score, risk band, decision thresholds, rationale, model version, structured explanations, reason codes, and warnings.
