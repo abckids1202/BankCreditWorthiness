@@ -25,6 +25,16 @@ The target is the UCI `default.payment.next.month` field. `SEX`, `EDUCATION`, `M
 
 Training also creates utilization, repayment-delay, payment-ratio, balance-trend, and account-stability features. It saves an educational 300–850 score alongside the raw default probability. Detailed artifacts are generated under `outputs/reports/`, including `training_report.json`, `threshold_analysis.csv`, calibration and risk-distribution plots, target-balance plots, and feature summaries.
 
+Supported dataset adapters can be profiled with:
+
+```powershell
+python scripts/profile_dataset.py --dataset uci_default
+python scripts/profile_dataset.py --dataset german_credit
+python scripts/profile_dataset.py --dataset give_me_some_credit
+```
+
+The UCI Default adapter downloads automatically. The German Credit adapter downloads the UCI archive automatically. The Give Me Some Credit adapter expects `cs-training.csv` downloaded from Kaggle at `data/raw/cs-training.csv`; it does not attempt to bypass Kaggle access controls.
+
 The policy uses configurable thresholds: low risk is approved, high risk is declined, and the middle band goes to human review. Inputs outside the expected distribution should also be reviewed. Removing sensitive fields does not prove that a model is fair, so the training report includes group-level approval and error-rate summaries. The numeric score is a presentation layer based on calibrated probability and configurable odds parameters in `configs/default.yaml`; it is not a real-world bureau score.
 
 ## API example
