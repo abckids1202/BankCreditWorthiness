@@ -15,6 +15,9 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     assert (tmp_path / "artifact" / "training_report.json").exists()
     assert metadata["dataset_summary"]["default_rate"] == 0.5
     assert metadata["metrics_test"]["roc_auc"] >= 0
+    assert metadata["metrics_validation"]["brier_score"] >= 0
+    assert metadata["feature_summary"]["income"]["type"] == "numeric"
+    assert metadata["training_timestamp"]
     assert len(metadata["training_config_sha256"]) == 64
     assert metadata["runtime"]["scikit_learn"]
     assert metadata["schema_version"] == "1.0"
@@ -54,3 +57,4 @@ def test_generic_trainer_uses_temporal_split_when_adapter_declares_time_column(t
     assert metadata["split_strategy"] == "temporal"
     assert metadata["dataset_summary"]["validation_rows"] == 4
     assert metadata["dataset_summary"]["test_rows"] == 4
+    assert metadata["metrics_validation"]["roc_auc"] >= 0
