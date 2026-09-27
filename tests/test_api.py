@@ -7,6 +7,18 @@ def test_health_endpoint():
     response = TestClient(app).get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+    assert response.headers.get("X-Request-ID")
+
+
+def test_request_id_is_preserved():
+    response = TestClient(app).get("/health", headers={"X-Request-ID": "test-request"})
+    assert response.headers["X-Request-ID"] == "test-request"
+
+
+def test_ready_endpoint():
+    response = TestClient(app).get("/ready")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
 
 
 def test_unknown_alternate_dataset_is_rejected():
