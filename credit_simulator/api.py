@@ -229,7 +229,7 @@ def predict(applicant: Applicant, request: Request):
     warnings = ["Input is outside the training distribution and was routed to review"] if outlier else []
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
     score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
-    prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None))
+    prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None), metadata.get("policy_version", "unknown"))
     return Prediction(risk_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
 
 
@@ -240,7 +240,7 @@ def predict_batch(batch: BatchPredictionRequest, request: Request):
 
 
 @app.post("/predict/{dataset}", response_model=DatasetPrediction)
-def predict_alternate(dataset: str, request: DatasetPredictionRequest):
+def predict_alternate(dataset: str, request: DatasetPredictionRequest, http_request: Request):
     model, metadata = _dataset_artifacts(dataset)
     expected = set(metadata["feature_names"]); received = set(request.features)
     missing, unknown = sorted(expected - received), sorted(received - expected)
@@ -252,7 +252,9 @@ def predict_alternate(dataset: str, request: DatasetPredictionRequest):
         decision = decide(probability)
     except (KeyError, ValueError, TypeError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], policy_version=metadata.get("policy_version", "alternate-experiment-0.1.0"), warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
+    policy_version = metadata.get("policy_version", "alternate-experiment-0.1.0")
+    prediction_store.record(dataset, metadata["model_version"], probability, probability_to_score(probability), risk_band(probability), decision.decision, getattr(http_request.state, "request_id", None), policy_version)
+    return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], policy_version=policy_version, warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/review-cases")
