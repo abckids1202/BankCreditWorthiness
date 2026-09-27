@@ -88,6 +88,7 @@ def test_optional_api_key(monkeypatch):
     monkeypatch.setenv("CREDIT_API_KEY", "test-secret")
     client = TestClient(app)
     assert client.get("/model-info").status_code == 401
+    assert client.get("/model-info", headers={"X-API-Key": "wrong-secret"}).status_code == 401
     assert client.get("/model-info", headers={"X-API-Key": "test-secret"}).status_code == 200
 
 

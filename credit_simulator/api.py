@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -46,7 +47,8 @@ async def request_context(request, call_next):
     started = time.perf_counter()
     configured_key = os.getenv("CREDIT_API_KEY")
     public_paths = {"/health", "/ready", "/docs", "/openapi.json", "/redoc"}
-    if configured_key and request.url.path not in public_paths and request.headers.get("X-API-Key") != configured_key:
+    supplied_key = request.headers.get("X-API-Key", "")
+    if configured_key and request.url.path not in public_paths and not hmac.compare_digest(supplied_key, configured_key):
         response = JSONResponse(status_code=401, content={"detail": "Missing or invalid X-API-Key"})
     else:
         rate_limit_raw = os.getenv("CREDIT_RATE_LIMIT_PER_MINUTE")
