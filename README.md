@@ -89,7 +89,7 @@ The dashboard is organized into eight tabs: applicant scoring, score explanation
 
 ## API example
 
-After training, use the Swagger UI or send JSON to `POST /predict`. The request contains `LIMIT_BAL`, six repayment-status fields (`PAY_0`, `PAY_2`–`PAY_6`), six bill fields, and six payment fields. The response contains the modeled probability as both the legacy `risk_probability` field and the explicit `default_probability` field, plus credit score, risk band, decision thresholds, rationale, model version, dataset version (the training-data SHA-256), structured explanations, reason codes, and warnings.
+After training, use the Swagger UI or send JSON to `POST /predict`. The request contains `LIMIT_BAL`, six repayment-status fields (`PAY_0`, `PAY_2`–`PAY_6`), six bill fields, and six payment fields. The response contains the modeled probability as both the legacy `risk_probability` field and the explicit `default_probability` field, plus credit score, risk band, decision thresholds, rationale, experiment ID, model version, dataset version (the training-data SHA-256), structured explanations, reason codes, and warnings. Review cases retain the same experiment ID so a later reviewer can identify the exact training run behind the automatic recommendation.
 
 Copy-paste demo commands using synthetic data:
 

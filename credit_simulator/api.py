@@ -97,6 +97,7 @@ class Prediction(BaseModel):
     rationale: str
     decision_thresholds: dict[str, float]
     model_version: str
+    experiment_id: str = "unknown"
     policy_version: str
     dataset_version: str
     dataset_version: str = "unknown"
@@ -129,6 +130,7 @@ class DatasetPrediction(BaseModel):
     risk_band: str
     decision: str
     model_version: str
+    experiment_id: str = "unknown"
     policy_version: str
     dataset_version: str = "unknown"
     warnings: list[str]
@@ -144,6 +146,7 @@ class ReviewCase(BaseModel):
     updated_at: str
     applicant: dict[str, Any]
     model_version: str
+    experiment_id: str = "unknown"
     policy_version: str
     decision_thresholds: dict[str, float]
     risk_probability: FiniteFloat = Field(ge=0, le=1)
@@ -404,7 +407,7 @@ def predict(applicant: Applicant, request: Request):
         "Protected attributes are excluded from individual scoring; group fairness must be evaluated with audit data"
     ]
     prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None), metadata.get("policy_version", "unknown"), _dataset_version(metadata))
-    return Prediction(risk_probability=probability, default_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], dataset_version=_dataset_version(metadata), policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, fairness_warnings=fairness_warnings, educational_disclaimer=metadata["disclaimer"])
+    return Prediction(risk_probability=probability, default_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], experiment_id=metadata.get("experiment_id", "unknown"), dataset_version=_dataset_version(metadata), policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, fairness_warnings=fairness_warnings, educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/predict/batch", response_model=BatchPredictionResponse)
@@ -428,7 +431,7 @@ def predict_alternate(dataset: str, request: DatasetPredictionRequest, http_requ
         raise HTTPException(422, str(exc)) from exc
     policy_version = metadata.get("policy_version", "alternate-experiment-0.1.0")
     prediction_store.record(dataset, metadata["model_version"], probability, probability_to_score(probability), risk_band(probability), decision.decision, getattr(http_request.state, "request_id", None), policy_version, _dataset_version(metadata))
-    return DatasetPrediction(dataset=dataset, risk_probability=probability, default_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], dataset_version=_dataset_version(metadata), policy_version=policy_version, warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
+    return DatasetPrediction(dataset=dataset, risk_probability=probability, default_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], experiment_id=metadata.get("experiment_id", "unknown"), dataset_version=_dataset_version(metadata), policy_version=policy_version, warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/review-cases", response_model=ReviewCase)

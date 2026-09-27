@@ -5,10 +5,11 @@ import pytest
 
 def test_review_case_preserves_model_decision(tmp_path):
     store = ReviewStore(tmp_path / "reviews.db")
-    case = store.create({"LIMIT_BAL": 1000}, {"model_version": "test", "policy_version": "policy-0.1.0", "dataset_version": "dataset-1", "decision_thresholds": {"approve_max_risk": 0.2, "decline_min_risk": 0.45}, "risk_probability": 0.3, "credit_score": 600, "decision": "manual_review", "reason_codes": ["test"], "warnings": ["out_of_distribution"], "fairness_warnings": ["population-level audit required"], "data_quality_warnings": ["out_of_distribution"]})
+    case = store.create({"LIMIT_BAL": 1000}, {"model_version": "test", "experiment_id": "exp-test", "policy_version": "policy-0.1.0", "dataset_version": "dataset-1", "decision_thresholds": {"approve_max_risk": 0.2, "decline_min_risk": 0.45}, "risk_probability": 0.3, "credit_score": 600, "decision": "manual_review", "reason_codes": ["test"], "warnings": ["out_of_distribution"], "fairness_warnings": ["population-level audit required"], "data_quality_warnings": ["out_of_distribution"]})
     assert case["automatic_decision"] == "manual_review"
     assert case["policy_version"] == "policy-0.1.0"
     assert case["dataset_version"] == "dataset-1"
+    assert case["experiment_id"] == "exp-test"
     assert case["fairness_warnings"] == ["population-level audit required"]
     assert case["data_quality_warnings"] == ["out_of_distribution"]
     assert case["decision_thresholds"]["approve_max_risk"] == 0.2

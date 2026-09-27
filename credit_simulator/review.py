@@ -14,7 +14,7 @@ class ReviewStore:
         with self._connect() as connection:
             connection.execute("""CREATE TABLE IF NOT EXISTS review_cases (
                 case_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-                applicant_json TEXT NOT NULL, model_version TEXT NOT NULL, policy_version TEXT NOT NULL DEFAULT 'unknown', dataset_version TEXT NOT NULL DEFAULT 'unknown',
+                applicant_json TEXT NOT NULL, model_version TEXT NOT NULL, experiment_id TEXT NOT NULL DEFAULT 'unknown', policy_version TEXT NOT NULL DEFAULT 'unknown', dataset_version TEXT NOT NULL DEFAULT 'unknown',
                 decision_thresholds_json TEXT NOT NULL DEFAULT '{}', risk_probability REAL NOT NULL,
                 credit_score INTEGER NOT NULL, automatic_decision TEXT NOT NULL, reason_codes_json TEXT NOT NULL,
                 warnings_json TEXT NOT NULL, fairness_warnings_json TEXT NOT NULL DEFAULT '[]', data_quality_warnings_json TEXT NOT NULL DEFAULT '[]', reviewer_decision TEXT, reviewer_note TEXT, reviewer_id TEXT, reviewed_at TEXT
@@ -22,6 +22,8 @@ class ReviewStore:
             columns = {row[1] for row in connection.execute("PRAGMA table_info(review_cases)").fetchall()}
             if "policy_version" not in columns:
                 connection.execute("ALTER TABLE review_cases ADD COLUMN policy_version TEXT NOT NULL DEFAULT 'unknown'")
+            if "experiment_id" not in columns:
+                connection.execute("ALTER TABLE review_cases ADD COLUMN experiment_id TEXT NOT NULL DEFAULT 'unknown'")
             if "dataset_version" not in columns:
                 connection.execute("ALTER TABLE review_cases ADD COLUMN dataset_version TEXT NOT NULL DEFAULT 'unknown'")
             if "decision_thresholds_json" not in columns:
@@ -68,12 +70,12 @@ class ReviewStore:
         with self._connect() as connection:
             connection.execute(
                 """INSERT INTO review_cases (
-                    case_id, created_at, updated_at, applicant_json, model_version, policy_version, dataset_version, decision_thresholds_json,
+                    case_id, created_at, updated_at, applicant_json, model_version, experiment_id, policy_version, dataset_version, decision_thresholds_json,
                     risk_probability, credit_score, automatic_decision, reason_codes_json,
                     warnings_json, fairness_warnings_json, data_quality_warnings_json, reviewer_decision, reviewer_note, reviewer_id, reviewed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    case_id, now, now, json.dumps(applicant), prediction["model_version"],
+                    case_id, now, now, json.dumps(applicant), prediction["model_version"], prediction.get("experiment_id", "unknown"),
                     prediction.get("policy_version", "unknown"), prediction.get("dataset_version", "unknown"), json.dumps(prediction.get("decision_thresholds", {})), prediction["risk_probability"],
                     prediction["credit_score"], prediction["decision"], json.dumps(prediction["reason_codes"]),
                     json.dumps(prediction.get("warnings", [])), json.dumps(prediction.get("fairness_warnings", [])), json.dumps(prediction.get("data_quality_warnings", prediction.get("warnings", []))), None, None, None, None,

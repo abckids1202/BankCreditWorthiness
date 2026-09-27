@@ -96,6 +96,7 @@ def test_batch_prediction_endpoint():
     assert len(response.json()["predictions"][0]["dataset_version"]) == 64
     assert response.json()["predictions"][0]["default_probability"] == response.json()["predictions"][0]["risk_probability"]
     assert response.json()["predictions"][0]["fairness_warnings"]
+    assert response.json()["predictions"][0]["experiment_id"].startswith("exp-")
 
 
 def test_out_of_distribution_input_is_reviewed():
