@@ -12,6 +12,7 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.impute import SimpleImputer
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (accuracy_score, average_precision_score, balanced_accuracy_score,
                              brier_score_loss, confusion_matrix, f1_score, log_loss,
@@ -78,6 +79,14 @@ def _approval_rate_report(y_true, probabilities, target_rates=(0.50, 0.70, 0.80,
             "default_recall_not_approved": float(recall_score(actual, flagged, zero_division=0)),
         })
     return rows
+
+
+def _global_feature_importance(model, X_test, y_test, features, descriptions, random_state):
+    result = permutation_importance(model, X_test[features], y_test, scoring="roc_auc", n_repeats=5, random_state=random_state, n_jobs=1)
+    rows = []
+    for index, feature in enumerate(features):
+        rows.append({"feature": feature, "description": descriptions.get(feature, feature), "importance_mean": float(result.importances_mean[index]), "importance_std": float(result.importances_std[index])})
+    return sorted(rows, key=lambda row: row["importance_mean"], reverse=True)
 
 
 def _data_quality(frame, features):
@@ -191,24 +200,27 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     calibration = _calibration(y_test, test_probabilities)
     threshold_rows = _threshold_report(y_test, test_probabilities, config)
     approval_rate_rows = _approval_rate_report(y_test, test_probabilities)
+    feature_descriptions = engineered_feature_descriptions()
+    global_importance = _global_feature_importance(selected, X_test, y_test, features, feature_descriptions, config["random_state"])
     dataset_hash = hashlib.sha256(frame.to_csv(index=False).encode("utf-8")).hexdigest()
     version_payload = json.dumps({"dataset_sha256": dataset_hash, "config": config, "selected_model": selected_name}, sort_keys=True, default=str).encode("utf-8")
     artifact_fingerprint = hashlib.sha256(version_payload).hexdigest()[:12]
     model_version = f"0.3.0+{artifact_fingerprint}"
     joblib.dump(selected, output / "model.joblib")
     feature_stats = {name: {"mean": float(X_train[name].mean()), "std": float(max(X_train[name].std(), 1e-9))} for name in features if pd.api.types.is_numeric_dtype(X_train[name])}
-    metadata = {"model_version": model_version, "artifact_fingerprint": artifact_fingerprint, "selected_model": selected_name, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": engineered_feature_descriptions(), "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
+    metadata = {"model_version": model_version, "artifact_fingerprint": artifact_fingerprint, "selected_model": selected_name, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     fairness_frame = frame_test.copy()
     fairness_frame["AGE_BIN"] = pd.cut(fairness_frame["AGE"], bins=[0, 25, 35, 50, np.inf], labels=["<=25", "26-35", "36-50", "51+"])
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
     fairness_detailed = group_metrics(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], config["thresholds"]["approve_max_risk"], config["thresholds"]["decline_min_risk"])
-    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": engineered_feature_descriptions(), "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "fairness": fairness, "fairness_detailed": fairness_detailed}
+    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     register_model(metadata, output)
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     pd.DataFrame(threshold_rows).to_csv(report_dir / "threshold_analysis.csv", index=False)
     pd.DataFrame(approval_rate_rows).to_csv(report_dir / "approval_rate_analysis.csv", index=False)
+    pd.DataFrame(global_importance).to_csv(report_dir / "global_feature_importance.csv", index=False)
     (report_dir / "feature_summary.json").write_text(json.dumps(_data_quality(frame, features), indent=2, default=str), encoding="utf-8")
     _plots(frame_test, y_test, test_probabilities, report_dir, threshold_rows=threshold_rows, features=features, config=config)
     plt.figure(figsize=(6, 4))

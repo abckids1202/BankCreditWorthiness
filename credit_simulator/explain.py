@@ -4,6 +4,19 @@ import numpy as np
 import pandas as pd
 
 
+def _feature_effect_vector(estimator, size: int) -> np.ndarray:
+    """Get a stable directional/importance vector through calibration wrappers."""
+    estimators = getattr(estimator, "calibrated_classifiers_", None)
+    if estimators:
+        vectors = [_feature_effect_vector(getattr(item, "estimator", getattr(item, "base_estimator", item)), size) for item in estimators]
+        return np.nanmean(vectors, axis=0)
+    if hasattr(estimator, "coef_"):
+        return np.asarray(estimator.coef_)[0]
+    if hasattr(estimator, "feature_importances_"):
+        return np.asarray(estimator.feature_importances_)
+    return np.ones(size)
+
+
 def structured_reasons(model, frame: pd.DataFrame, feature_names: list[str], descriptions: dict[str, str] | None = None, top_n: int = 3) -> list[dict]:
     """Return transparent, directional reasons; these are not adverse-action notices."""
     values = frame[feature_names].astype(float).iloc[0].to_numpy()
@@ -13,12 +26,7 @@ def structured_reasons(model, frame: pd.DataFrame, feature_names: list[str], des
     transformed = imputer.transform(frame[feature_names])
     if scaler is not None:
         transformed = scaler.transform(transformed)
-    if hasattr(estimator, "coef_"):
-        contributions = transformed[0] * estimator.coef_[0]
-    else:
-        importance = getattr(estimator, "feature_importances_", np.ones(len(feature_names)))
-        center = np.nan_to_num(transformed[0])
-        contributions = center * importance
+    contributions = np.nan_to_num(transformed[0]) * _feature_effect_vector(estimator, len(feature_names))
     ranked = np.argsort(np.abs(contributions))[::-1][:top_n]
     descriptions = descriptions or {}
     reasons = []

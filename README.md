@@ -23,7 +23,7 @@ Train once on the host, then run `docker compose up --build`. The API is on port
 
 The target is the UCI `default.payment.next.month` field. `SEX`, `EDUCATION`, `MARRIAGE`, and `AGE` are retained for audit reporting but excluded from model features. Logistic regression and histogram gradient boosting are compared using ROC-AUC, PR-AUC, and Brier score; the better validation candidate is selected. Explanations are reason codes derived from the selected estimator, not legal adverse-action notices.
 
-Training also creates utilization, repayment-delay, payment-ratio, balance-trend, and account-stability features. It saves an educational 300–850 score alongside the raw default probability. Detailed artifacts are generated under `outputs/reports/`, including `training_report.json`, `threshold_analysis.csv`, `approval_rate_analysis.csv`, calibration, risk-distribution, feature-distribution, confusion-matrix, and threshold-comparison plots, target-balance plots, and feature summaries.
+Training also creates utilization, repayment-delay, payment-ratio, balance-trend, and account-stability features. It saves an educational 300–850 score alongside the raw default probability. Detailed artifacts are generated under `outputs/reports/`, including `training_report.json`, `threshold_analysis.csv`, `approval_rate_analysis.csv`, `global_feature_importance.csv`, calibration, risk-distribution, feature-distribution, confusion-matrix, and threshold-comparison plots, target-balance plots, and feature summaries.
 
 Each primary training run gets a reproducible version such as `0.3.0+8c1b78222395`. The fingerprint is derived from the dataset hash, selected model, and training configuration, so changing any of those inputs creates a distinguishable artifact version.
 
@@ -77,7 +77,7 @@ Every training run registers its artifact metadata in the local generated `artif
 
 Prediction events are logged to a local generated SQLite database without storing raw applicant inputs. Use `GET /prediction-stats` for aggregate counts by dataset, model version, and automatic decision. This is intended for educational observability and should be replaced with a governed retention system before any real deployment.
 
-The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Model evidence includes the candidate metrics, fairness report, calibration data, feature distributions, confusion matrix, risk distributions, and threshold comparison table/plot. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.
+The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Model evidence includes the candidate metrics, fairness report, calibration data, global permutation feature importance, feature distributions, confusion matrix, risk distributions, and threshold comparison table/plot. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.
 
 ## API example
 

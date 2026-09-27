@@ -111,6 +111,11 @@ with tabs[2]:
                 st.subheader("Performance at target approval rates")
                 st.caption("Default recall here means the fraction of observed defaults that were not approved in the held-out test split.")
                 st.dataframe(pd.read_csv(approval_path), use_container_width=True, hide_index=True)
+            importance = report.get("global_feature_importance", [])
+            if importance:
+                st.subheader("Global feature importance")
+                st.caption("Permutation importance measures the change in held-out ROC-AUC when a feature is shuffled. It describes model behavior, not causality.")
+                st.dataframe(pd.DataFrame(importance), use_container_width=True, hide_index=True)
         with fairness_tab:
             st.json(report.get("fairness_detailed", report.get("fairness", {})))
         with calibration_tab:
