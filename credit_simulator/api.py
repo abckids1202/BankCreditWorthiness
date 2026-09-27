@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from .explain import reason_codes, structured_reasons
 from .features import engineer_features
@@ -51,10 +51,12 @@ async def request_context(request, call_next):
 
 class Applicant(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    LIMIT_BAL: float = Field(gt=0)
-    PAY_0: float; PAY_2: float; PAY_3: float; PAY_4: float; PAY_5: float; PAY_6: float
-    BILL_AMT1: float; BILL_AMT2: float; BILL_AMT3: float; BILL_AMT4: float; BILL_AMT5: float; BILL_AMT6: float
-    PAY_AMT1: float; PAY_AMT2: float; PAY_AMT3: float; PAY_AMT4: float; PAY_AMT5: float; PAY_AMT6: float
+    LIMIT_BAL: FiniteFloat = Field(gt=0)
+    PAY_0: FiniteFloat = Field(ge=-2, le=8); PAY_2: FiniteFloat = Field(ge=-2, le=8); PAY_3: FiniteFloat = Field(ge=-2, le=8)
+    PAY_4: FiniteFloat = Field(ge=-2, le=8); PAY_5: FiniteFloat = Field(ge=-2, le=8); PAY_6: FiniteFloat = Field(ge=-2, le=8)
+    BILL_AMT1: FiniteFloat; BILL_AMT2: FiniteFloat; BILL_AMT3: FiniteFloat; BILL_AMT4: FiniteFloat; BILL_AMT5: FiniteFloat; BILL_AMT6: FiniteFloat
+    PAY_AMT1: FiniteFloat = Field(ge=0); PAY_AMT2: FiniteFloat = Field(ge=0); PAY_AMT3: FiniteFloat = Field(ge=0)
+    PAY_AMT4: FiniteFloat = Field(ge=0); PAY_AMT5: FiniteFloat = Field(ge=0); PAY_AMT6: FiniteFloat = Field(ge=0)
 
 
 class Prediction(BaseModel):

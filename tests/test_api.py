@@ -42,6 +42,16 @@ def test_out_of_distribution_input_is_reviewed():
     assert response.json()["decision"] == "manual_review"
 
 
+def test_out_of_range_repayment_status_is_rejected():
+    applicant = {"LIMIT_BAL": 50000, "PAY_0": 9, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
+    assert TestClient(app).post("/predict", json=applicant).status_code == 422
+
+
+def test_negative_payment_is_rejected_by_api():
+    applicant = {"LIMIT_BAL": 50000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": -1, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
+    assert TestClient(app).post("/predict", json=applicant).status_code == 422
+
+
 def test_optional_api_key(monkeypatch):
     monkeypatch.setenv("CREDIT_API_KEY", "test-secret")
     client = TestClient(app)
