@@ -102,7 +102,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/predict -ContentType "
 .\examples\requests.ps1
 ```
 
-Training prints a JSON summary containing the dataset, experiment ID, model version, policy version, artifact fingerprint, output directory, and held-out test metrics. `GET /ready` exposes the same experiment ID for the currently serving artifact. The same summary format is used for alternate dataset experiments.
+Training prints a JSON summary containing the dataset, experiment ID, model version, policy version, artifact fingerprint, output directory, and held-out test metrics. `GET /ready` exposes the same experiment ID for the currently serving artifact. The same summary format is used for alternate dataset experiments. CI also runs the dependency-free `python scripts/static_check.py` syntax gate before training and tests.
 
 The same sample payload is available at `examples/sample_applicant.json`; it contains no real personal information.
 
