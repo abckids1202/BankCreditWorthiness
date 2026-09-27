@@ -25,6 +25,8 @@ The target is the UCI `default.payment.next.month` field. `SEX`, `EDUCATION`, `M
 
 Training also creates utilization, repayment-delay, payment-ratio, balance-trend, and account-stability features. It saves an educational 300–850 score alongside the raw default probability. Detailed artifacts are generated under `outputs/reports/`, including `training_report.json`, `threshold_analysis.csv`, calibration and risk-distribution plots, target-balance plots, and feature summaries.
 
+The threshold CSV evaluates precision, recall, false-positive rate, and false-negative rate at each tested decline threshold, alongside approval/review/decline population rates, default rates by decision group, and configurable expected cost.
+
 Supported dataset adapters can be profiled with:
 
 ```powershell
