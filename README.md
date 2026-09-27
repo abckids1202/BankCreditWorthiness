@@ -77,7 +77,7 @@ Every training run registers its artifact metadata in the local generated `artif
 
 Prediction events are logged to a local generated SQLite database without storing raw applicant inputs. Use `GET /prediction-stats` for aggregate counts by dataset, model version, and automatic decision. This is intended for educational observability and should be replaced with a governed retention system before any real deployment.
 
-The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.
+The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Model evidence includes the candidate metrics, fairness report, calibration data, feature distributions, confusion matrix, risk distributions, and threshold comparison table/plot. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.
 
 ## API example
 

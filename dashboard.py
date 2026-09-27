@@ -5,6 +5,7 @@ from pathlib import Path
 
 import requests
 import streamlit as st
+import pandas as pd
 
 
 st.set_page_config(page_title="Credit Risk Simulator", page_icon="🏦", layout="wide")
@@ -86,9 +87,25 @@ with tabs[2]:
     report_path = Path("outputs/reports/training_report.json")
     if report_path.exists():
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        metric_tab, fairness_tab, calibration_tab = st.tabs(["Metrics", "Fairness", "Calibration"])
+        metric_tab, visual_tab, fairness_tab, calibration_tab = st.tabs(["Metrics", "Visual diagnostics", "Fairness", "Calibration"])
         with metric_tab:
             st.json({"selected_model": report.get("selected_model"), "candidate_metrics": report.get("candidate_metrics"), "test_metrics": report.get("test_metrics")})
+        with visual_tab:
+            st.caption("These diagnostics describe the held-out test split and the configured policy. They are evidence for learning and review, not lending decisions.")
+            image_columns = st.columns(2)
+            for column, filename, caption in [
+                (image_columns[0], "feature_distributions.png", "Feature distributions"),
+                (image_columns[1], "confusion_matrix.png", "Confusion matrix"),
+                (image_columns[0], "threshold_comparison.png", "Decision population by threshold"),
+                (image_columns[1], "risk_distribution.png", "Predicted-risk distributions"),
+            ]:
+                image = Path("outputs/reports") / filename
+                if image.exists():
+                    column.image(str(image), caption=caption, use_container_width=True)
+            threshold_path = Path("outputs/reports/threshold_analysis.csv")
+            if threshold_path.exists():
+                st.subheader("Threshold comparison data")
+                st.dataframe(pd.read_csv(threshold_path), use_container_width=True, hide_index=True)
         with fairness_tab:
             st.json(report.get("fairness_detailed", report.get("fairness", {})))
         with calibration_tab:
