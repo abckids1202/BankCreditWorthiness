@@ -29,7 +29,9 @@ The policy uses configurable thresholds: low risk is approved, high risk is decl
 
 ## API example
 
-After training, use the Swagger UI or send JSON to `POST /predict`. The request contains `LIMIT_BAL`, six repayment-status fields (`PAY_0`, `PAY_2`–`PAY_6`), six bill fields, and six payment fields. The response contains the modeled probability, credit score, risk band, decision thresholds, rationale, model version, reason codes, and warnings.
+After training, use the Swagger UI or send JSON to `POST /predict`. The request contains `LIMIT_BAL`, six repayment-status fields (`PAY_0`, `PAY_2`–`PAY_6`), six bill fields, and six payment fields. The response contains the modeled probability, credit score, risk band, decision thresholds, rationale, model version, structured explanations, reason codes, and warnings.
+
+Borderline cases can be persisted for educational human review with `POST /review-cases`, listed with `GET /review-cases`, inspected with `GET /review-cases/{case_id}`, and updated with `PATCH /review-cases/{case_id}`. SQLite stores the original automatic decision separately from the reviewer decision; reviewer outcomes are not allowed to overwrite the model output.
 
 ## Limitations
 

@@ -9,13 +9,15 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from .explain import reason_codes
+from .explain import reason_codes, structured_reasons
 from .features import engineer_features
 from .policy import decide
 from .scoring import probability_to_score, risk_band
+from .review import ReviewStore
 
 
 ARTIFACT_DIR = Path("artifacts")
+review_store = ReviewStore()
 app = FastAPI(title="Explainable Credit Approval Simulator", version="0.1.0", description="Educational prototype only; not for real lending decisions.")
 
 
@@ -36,6 +38,7 @@ class Prediction(BaseModel):
     decision_thresholds: dict[str, float]
     model_version: str
     reason_codes: list[str]
+    explanations: list[dict]
     warnings: list[str]
     educational_disclaimer: str
 
@@ -73,5 +76,41 @@ def predict(applicant: Applicant):
     except (KeyError, ValueError) as exc:
         raise HTTPException(422, str(exc)) from exc
     warnings = ["Input contains an extreme value and was routed to review"] if outlier else []
-    return Prediction(risk_probability=probability, credit_score=probability_to_score(probability, metadata["score"]), risk_band=risk_band(probability, metadata["risk_bands"]), decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+    explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
+    return Prediction(risk_probability=probability, credit_score=probability_to_score(probability, metadata["score"]), risk_band=risk_band(probability, metadata["risk_bands"]), decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+
+
+@app.post("/review-cases")
+def create_review_case(applicant: Applicant):
+    prediction = predict(applicant).model_dump()
+    return review_store.create(applicant.model_dump(), prediction)
+
+
+@app.get("/review-cases")
+def list_review_cases(limit: int = 50):
+    return review_store.list(limit)
+
+
+@app.get("/review-cases/{case_id}")
+def get_review_case(case_id: str):
+    case = review_store.get(case_id)
+    if not case:
+        raise HTTPException(404, "Review case not found")
+    return case
+
+
+class ReviewUpdate(BaseModel):
+    reviewer_decision: str | None = None
+    reviewer_note: str | None = None
+
+
+@app.patch("/review-cases/{case_id}")
+def update_review_case(case_id: str, update: ReviewUpdate):
+    try:
+        case = review_store.update(case_id, update.reviewer_decision, update.reviewer_note)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if not case:
+        raise HTTPException(404, "Review case not found")
+    return case
 

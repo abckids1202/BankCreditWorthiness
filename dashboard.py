@@ -35,6 +35,14 @@ if submitted:
         st.subheader("Reason codes")
         for reason in result["reason_codes"]:
             st.write(f"• {reason}")
+        with st.expander("Structured model explanations"):
+            st.json(result.get("explanations", []))
+        if result["decision"] == "manual_review" and st.button("Create review case"):
+            review_response = requests.post(f"{api_url}/review-cases", json=values, timeout=30)
+            if review_response.ok:
+                st.success(f"Review case created: {review_response.json()['case_id']}")
+            else:
+                st.error(review_response.text)
     except requests.RequestException as exc:
         st.error(f"Could not reach the scoring API: {exc}")
 
