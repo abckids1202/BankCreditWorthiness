@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,4 +35,20 @@ def list_models(registry_path: str | Path = "artifacts/model_registry.json") -> 
         entries = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return []
-    return entries if isinstance(entries, list) else []
+    if not isinstance(entries, list):
+        return []
+    enriched = []
+    for entry in entries:
+        item = dict(entry)
+        artifact_dir = Path(item.get("artifact_dir", ""))
+        model_path, metadata_path = artifact_dir / "model.joblib", artifact_dir / "metadata.json"
+        item["artifact_available"] = model_path.exists() and metadata_path.exists()
+        item["checksum_valid"] = False
+        if item["artifact_available"]:
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                item["checksum_valid"] = metadata.get("model_sha256") == hashlib.sha256(model_path.read_bytes()).hexdigest()
+            except (OSError, ValueError, json.JSONDecodeError):
+                item["checksum_valid"] = False
+        enriched.append(item)
+    return enriched
