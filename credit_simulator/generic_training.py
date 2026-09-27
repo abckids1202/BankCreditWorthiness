@@ -30,6 +30,9 @@ def train_tabular(bundle: DatasetBundle, output_dir: str | Path, random_state: i
     """
     output = Path(output_dir); output.mkdir(parents=True, exist_ok=True)
     features = [column for column in bundle.feature_columns if column not in set(bundle.protected_attributes)]
+    suspicious = [name for name in features if str(name).lower() in {"target", "label", "default"} or str(name).lower() == str(bundle.target).lower()]
+    if suspicious:
+        raise ValueError(f"Potential target leakage in alternate model features: {suspicious}")
     X, y = bundle.frame[features], bundle.frame[bundle.target].astype(int)
     numeric = X.select_dtypes(include=np.number).columns.tolist(); categorical = [column for column in features if column not in numeric]
     preprocess = ColumnTransformer([("numeric", Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())]), numeric), ("categorical", Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore"))]), categorical)], remainder="drop")

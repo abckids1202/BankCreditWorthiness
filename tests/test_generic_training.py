@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from credit_simulator.datasets import DatasetBundle
 from credit_simulator.generic_training import train_tabular
@@ -21,3 +22,10 @@ def test_generic_trainer_version_is_reproducible(tmp_path):
     second = train_tabular(bundle, tmp_path / "second")
     assert first["model_version"] == second["model_version"]
     assert first["artifact_fingerprint"] == second["artifact_fingerprint"]
+
+
+def test_generic_trainer_rejects_target_leakage(tmp_path):
+    frame = pd.DataFrame({"income": [10, 20, 30, 40], "target": [0, 1, 0, 1], "default": [0, 1, 0, 1]})
+    bundle = DatasetBundle("synthetic", frame, "default", [], ["income", "target"], {"source_url": "test"})
+    with pytest.raises(ValueError, match="leakage"):
+        train_tabular(bundle, tmp_path / "artifact")
