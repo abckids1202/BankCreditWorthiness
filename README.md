@@ -23,11 +23,11 @@ Train once on the host, then run `docker compose up --build`. The API is on port
 
 The target is the UCI `default.payment.next.month` field. `SEX`, `EDUCATION`, `MARRIAGE`, and `AGE` are retained for audit reporting but excluded from model features. Logistic regression and histogram gradient boosting are compared using ROC-AUC, PR-AUC, and Brier score; the better validation candidate is selected. Explanations are reason codes derived from the selected estimator, not legal adverse-action notices.
 
-Training also creates utilization, repayment-delay, payment-ratio, balance-trend, and account-stability features. It saves an educational 300–850 score alongside the raw default probability. Detailed artifacts are generated under `outputs/reports/`, including `training_report.json`, `threshold_analysis.csv`, calibration, risk-distribution, feature-distribution, confusion-matrix, and threshold-comparison plots, target-balance plots, and feature summaries.
+Training also creates utilization, repayment-delay, payment-ratio, balance-trend, and account-stability features. It saves an educational 300–850 score alongside the raw default probability. Detailed artifacts are generated under `outputs/reports/`, including `training_report.json`, `threshold_analysis.csv`, `approval_rate_analysis.csv`, calibration, risk-distribution, feature-distribution, confusion-matrix, and threshold-comparison plots, target-balance plots, and feature summaries.
 
 Each primary training run gets a reproducible version such as `0.3.0+8c1b78222395`. The fingerprint is derived from the dataset hash, selected model, and training configuration, so changing any of those inputs creates a distinguishable artifact version.
 
-The threshold CSV evaluates precision, recall, false-positive rate, and false-negative rate at each tested decline threshold, alongside approval/review/decline population rates, default rates by decision group, and configurable expected cost.
+The threshold CSV evaluates precision, recall, false-positive rate, and false-negative rate at each tested decline threshold, alongside approval/review/decline population rates, default rates by decision group, and configurable expected cost. The approval-rate report separately evaluates default precision and recall when approving the lowest-risk 50%, 70%, 80%, and 90% of the held-out population; these are diagnostic operating points, not recommended lending cutoffs.
 
 Supported dataset adapters can be profiled with:
 

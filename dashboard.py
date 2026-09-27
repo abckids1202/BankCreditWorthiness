@@ -106,6 +106,11 @@ with tabs[2]:
             if threshold_path.exists():
                 st.subheader("Threshold comparison data")
                 st.dataframe(pd.read_csv(threshold_path), use_container_width=True, hide_index=True)
+            approval_path = Path("outputs/reports/approval_rate_analysis.csv")
+            if approval_path.exists():
+                st.subheader("Performance at target approval rates")
+                st.caption("Default recall here means the fraction of observed defaults that were not approved in the held-out test split.")
+                st.dataframe(pd.read_csv(approval_path), use_container_width=True, hide_index=True)
         with fairness_tab:
             st.json(report.get("fairness_detailed", report.get("fairness", {})))
         with calibration_tab:

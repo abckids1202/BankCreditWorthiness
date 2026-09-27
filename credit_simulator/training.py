@@ -53,6 +53,33 @@ def _threshold_report(y_true, probabilities, config):
     return rows
 
 
+def _approval_rate_report(y_true, probabilities, target_rates=(0.50, 0.70, 0.80, 0.90)):
+    """Summarize binary accept/reject performance at target approval rates.
+
+    The cutoff approves the lowest-risk applicants. ``default_recall`` measures
+    the fraction of observed defaults that were not approved; it is not a
+    guarantee about future applicants or a production underwriting objective.
+    """
+    actual = np.asarray(y_true).astype(int)
+    scores = np.asarray(probabilities, dtype=float)
+    rows = []
+    for target_rate in target_rates:
+        cutoff = float(np.quantile(scores, target_rate))
+        approved = scores <= cutoff
+        flagged = ~approved
+        rows.append({
+            "target_approval_rate": float(target_rate),
+            "risk_cutoff": cutoff,
+            "achieved_approval_rate": float(approved.mean()),
+            "default_rate_approved": float(actual[approved].mean()) if approved.any() else None,
+            "approved_count": int(approved.sum()),
+            "not_approved_count": int(flagged.sum()),
+            "default_precision_not_approved": float(precision_score(actual, flagged, zero_division=0)),
+            "default_recall_not_approved": float(recall_score(actual, flagged, zero_division=0)),
+        })
+    return rows
+
+
 def _data_quality(frame, features):
     numeric = frame[features].select_dtypes(include=np.number)
     return {"rows": int(len(frame)), "columns": int(len(frame.columns)), "duplicate_rows": int(frame.duplicated().sum()), "missing_by_column": {str(k): float(v) for k, v in frame.isna().mean().items()}, "constant_columns": [str(c) for c in frame.columns if frame[c].nunique(dropna=False) <= 1], "numeric_summary": json.loads(numeric.describe(percentiles=[0.01, 0.5, 0.99]).transpose().to_json())}
@@ -163,6 +190,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     test_metrics = _metrics(y_test, test_probabilities)
     calibration = _calibration(y_test, test_probabilities)
     threshold_rows = _threshold_report(y_test, test_probabilities, config)
+    approval_rate_rows = _approval_rate_report(y_test, test_probabilities)
     dataset_hash = hashlib.sha256(frame.to_csv(index=False).encode("utf-8")).hexdigest()
     version_payload = json.dumps({"dataset_sha256": dataset_hash, "config": config, "selected_model": selected_name}, sort_keys=True, default=str).encode("utf-8")
     artifact_fingerprint = hashlib.sha256(version_payload).hexdigest()[:12]
@@ -175,11 +203,12 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     fairness_frame["AGE_BIN"] = pd.cut(fairness_frame["AGE"], bins=[0, 25, 35, 50, np.inf], labels=["<=25", "26-35", "36-50", "51+"])
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
     fairness_detailed = group_metrics(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], config["thresholds"]["approve_max_risk"], config["thresholds"]["decline_min_risk"])
-    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": engineered_feature_descriptions(), "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "calibration": calibration, "threshold_analysis": threshold_rows, "fairness": fairness, "fairness_detailed": fairness_detailed}
+    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": engineered_feature_descriptions(), "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "fairness": fairness, "fairness_detailed": fairness_detailed}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     register_model(metadata, output)
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     pd.DataFrame(threshold_rows).to_csv(report_dir / "threshold_analysis.csv", index=False)
+    pd.DataFrame(approval_rate_rows).to_csv(report_dir / "approval_rate_analysis.csv", index=False)
     (report_dir / "feature_summary.json").write_text(json.dumps(_data_quality(frame, features), indent=2, default=str), encoding="utf-8")
     _plots(frame_test, y_test, test_probabilities, report_dir, threshold_rows=threshold_rows, features=features, config=config)
     plt.figure(figsize=(6, 4))
