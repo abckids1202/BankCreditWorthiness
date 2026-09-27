@@ -285,12 +285,13 @@ def get_review_case_history(case_id: str):
 class ReviewUpdate(BaseModel):
     reviewer_decision: Literal["approved", "declined", "needs_more_information", "escalated"] | None = None
     reviewer_note: str | None = Field(default=None, max_length=5000)
+    reviewer_id: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 @app.patch("/review-cases/{case_id}")
 def update_review_case(case_id: str, update: ReviewUpdate):
     try:
-        case = review_store.update(case_id, update.reviewer_decision, update.reviewer_note)
+        case = review_store.update(case_id, update.reviewer_decision, update.reviewer_note, update.reviewer_id)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     if not case:

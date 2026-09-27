@@ -161,9 +161,10 @@ with tabs[3]:
                 st.dataframe(history["events"], use_container_width=True)
             with st.form("review_update"):
                 decision = st.selectbox("Reviewer decision", ["approved", "declined", "needs_more_information", "escalated"])
+                reviewer_id = st.text_input("Reviewer ID", placeholder="e.g. reviewer-demo")
                 note = st.text_area("Reviewer note")
                 if st.form_submit_button("Save review"):
-                    updated = api_request("PATCH", f"/review-cases/{selected_id}", json={"reviewer_decision": decision, "reviewer_note": note})
+                    updated = api_request("PATCH", f"/review-cases/{selected_id}", json={"reviewer_decision": decision, "reviewer_note": note, "reviewer_id": reviewer_id or None})
                     st.success(f"Saved {updated['reviewer_decision']}")
         else:
             st.info("No review cases yet.")

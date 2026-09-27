@@ -9,13 +9,15 @@ def test_review_case_preserves_model_decision(tmp_path):
     assert case["automatic_decision"] == "manual_review"
     assert case["policy_version"] == "policy-0.1.0"
     assert store.history(case["case_id"])[0]["event_type"] == "created"
-    updated = store.update(case["case_id"], "approved", "Reviewed for prototype")
+    updated = store.update(case["case_id"], "approved", "Reviewed for prototype", "reviewer-demo")
     assert updated["automatic_decision"] == "manual_review"
     assert updated["reviewer_decision"] == "approved"
+    assert updated["reviewer_id"] == "reviewer-demo"
     events = store.history(case["case_id"])
     assert len(events) == 2
     assert events[1]["reviewer_decision"] == "approved"
     assert events[1]["reviewer_note"] == "Reviewed for prototype"
+    assert events[1]["reviewer_id"] == "reviewer-demo"
 
 
 def test_review_history_missing_case_returns_none(tmp_path):
@@ -54,4 +56,9 @@ def test_review_update_schema_rejects_unknown_decision():
 def test_review_update_schema_limits_notes():
     with pytest.raises(ValueError):
         ReviewUpdate.model_validate({"reviewer_note": "x" * 5001})
+
+
+def test_review_update_schema_validates_reviewer_id():
+    with pytest.raises(ValueError):
+        ReviewUpdate.model_validate({"reviewer_id": ""})
 
