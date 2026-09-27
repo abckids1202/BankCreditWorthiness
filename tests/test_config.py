@@ -20,3 +20,18 @@ def test_missing_policy_version_is_rejected():
     config["policy_version"] = ""
     with pytest.raises(ValueError, match="policy_version"):
         validate_config(config)
+
+
+def test_invalid_split_sizes_are_rejected():
+    config = load_config()
+    config["test_size"] = 0.8
+    config["validation_size"] = 0.3
+    with pytest.raises(ValueError, match="test_size"):
+        validate_config(config)
+
+
+def test_invalid_score_settings_are_rejected():
+    config = load_config()
+    config["score"]["base_odds"] = 0
+    with pytest.raises(ValueError, match="score"):
+        validate_config(config)
