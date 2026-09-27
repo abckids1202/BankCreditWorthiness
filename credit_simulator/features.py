@@ -57,7 +57,9 @@ def engineer_features(frame: pd.DataFrame) -> pd.DataFrame:
     result["average_payment_delay"] = late.mean(axis=1)
     result["recent_three_month_delay"] = late[:, :3].mean(axis=1)
     result["payment_delay_trend"] = _slope(late)
+    result["six_month_payment_delay_trend"] = result["payment_delay_trend"]
     result["consecutive_late_months"] = np.array([next((i for i, value in enumerate(row) if value <= 0), len(row)) for row in late])
+    result["payment_to_bill_ratio"] = payment_ratio[:, 0]
     result["average_payment_to_bill_ratio"] = payment_ratio.mean(axis=1)
     result["minimum_payment_to_bill_ratio"] = payment_ratio.min(axis=1)
     result["months_paying_less_than_bill"] = (payments < np.abs(bills)).sum(axis=1)
@@ -88,7 +90,9 @@ def engineered_feature_descriptions() -> dict[str, str]:
         "average_payment_delay": "Average positive payment-delay severity",
         "recent_three_month_delay": "Average payment-delay severity in the three most recent months",
         "payment_delay_trend": "Linear trend in payment-delay severity",
+        "six_month_payment_delay_trend": "Linear trend in payment-delay severity across all six historical months",
         "consecutive_late_months": "Recent consecutive months with late-payment status",
+        "payment_to_bill_ratio": "Most recent payment amount divided by the most recent absolute bill amount",
         "average_payment_to_bill_ratio": "Average payment amount divided by absolute bill amount",
         "minimum_payment_to_bill_ratio": "Minimum payment-to-bill ratio",
         "months_paying_less_than_bill": "Number of months where payment was below absolute bill amount",

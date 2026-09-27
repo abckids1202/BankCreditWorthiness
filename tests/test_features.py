@@ -12,7 +12,8 @@ def test_feature_engineering_adds_behavioral_features():
     output = engineer_features(pd.DataFrame([row]))
     assert output.loc[0, "late_payment_count"] == 2
     assert output.loc[0, "current_utilization"] == 0.5
-    assert "payment_to_bill_ratio" not in output.columns
+    assert output.loc[0, "payment_to_bill_ratio"] == pytest.approx(0.2)
+    assert output.loc[0, "six_month_payment_delay_trend"] == pytest.approx(output.loc[0, "payment_delay_trend"])
     assert output.loc[0, "average_payment_to_bill_ratio"] == pytest.approx(0.2)
 
 
