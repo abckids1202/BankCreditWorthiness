@@ -48,6 +48,8 @@ python scripts/train.py --dataset give_me_some_credit --output-dir artifacts/giv
 
 Those alternate artifacts are experiment outputs and are not wired into the current credit-card `/predict` contract, which intentionally remains schema-safe. The German Credit path has been verified end-to-end; Give Me Some Credit requires its Kaggle CSV first.
 
+Alternate training artifacts also receive reproducible fingerprints based on the dataset contents, schema, target, and random seed, allowing experiments to be compared without treating generated model binaries as source code.
+
 After an alternate model is trained, it can be scored through a dataset-specific endpoint using a feature map:
 
 ```text

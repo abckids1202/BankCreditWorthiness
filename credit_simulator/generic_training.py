@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import time
 from pathlib import Path
 
@@ -35,6 +36,9 @@ def train_tabular(bundle: DatasetBundle, output_dir: str | Path, random_state: i
     model = CalibratedClassifierCV(estimator=base, method="sigmoid", cv=3)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=random_state)
     started = time.perf_counter(); model.fit(X_train, y_train); probabilities = model.predict_proba(X_test)[:, 1]
-    metadata = {"model_version": "0.1.0", "dataset": bundle.name, "target": bundle.target, "feature_names": features, "protected_attributes": bundle.protected_attributes, "numeric_features": numeric, "categorical_features": categorical, "metrics_test": {"roc_auc": float(roc_auc_score(y_test, probabilities)), "pr_auc": float(average_precision_score(y_test, probabilities)), "log_loss": float(log_loss(y_test, probabilities, labels=[0, 1])), "brier_score": float(brier_score_loss(y_test, probabilities))}, "training_rows": int(len(X_train)), "test_rows": int(len(X_test)), "training_seconds": time.perf_counter() - started, "source_metadata": bundle.metadata, "disclaimer": "Educational experiment; not for real lending decisions."}
+    dataset_hash = hashlib.sha256(bundle.frame.to_csv(index=False).encode("utf-8")).hexdigest()
+    fingerprint_payload = json.dumps({"dataset_sha256": dataset_hash, "dataset": bundle.name, "target": bundle.target, "features": features, "random_state": random_state}, sort_keys=True).encode("utf-8")
+    artifact_fingerprint = hashlib.sha256(fingerprint_payload).hexdigest()[:12]
+    metadata = {"model_version": f"0.2.0+{artifact_fingerprint}", "artifact_fingerprint": artifact_fingerprint, "dataset_sha256": dataset_hash, "dataset": bundle.name, "target": bundle.target, "feature_names": features, "protected_attributes": bundle.protected_attributes, "numeric_features": numeric, "categorical_features": categorical, "metrics_test": {"roc_auc": float(roc_auc_score(y_test, probabilities)), "pr_auc": float(average_precision_score(y_test, probabilities)), "log_loss": float(log_loss(y_test, probabilities, labels=[0, 1])), "brier_score": float(brier_score_loss(y_test, probabilities))}, "training_rows": int(len(X_train)), "test_rows": int(len(X_test)), "training_seconds": time.perf_counter() - started, "source_metadata": bundle.metadata, "disclaimer": "Educational experiment; not for real lending decisions."}
     joblib.dump(model, output / "model.joblib"); (output / "metadata.json").write_text(json.dumps(metadata, indent=2, default=str), encoding="utf-8"); register_model(metadata, output, output.parent / "model_registry.json")
     return metadata
