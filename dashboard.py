@@ -51,7 +51,7 @@ with tabs[0]:
         score_col.metric("Credit score", result["credit_score"])
         risk_col.metric("Default risk", f"{result['risk_probability']:.1%}")
         decision_col.metric("Recommendation", result["decision"].replace("_", " ").title())
-        st.caption(f"Risk band: {result['risk_band']} | Model: {result['model_version']}")
+        st.caption(f"Risk band: {result['risk_band']} | Model: {result['model_version']} | Policy: {result.get('policy_version', 'unknown')}")
         st.info(result["rationale"])
         for warning in result.get("warnings", []):
             st.warning(warning)

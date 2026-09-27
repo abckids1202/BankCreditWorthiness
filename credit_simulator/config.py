@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def validate_config(config: dict) -> dict:
     if not isinstance(config, dict):
         raise ValueError("configuration must be a mapping")
+    if not isinstance(config.get("policy_version"), str) or not config["policy_version"].strip():
+        raise ValueError("policy_version must be a non-empty string")
     thresholds = config.get("thresholds", {})
     approve = thresholds.get("approve_max_risk")
     decline = thresholds.get("decline_min_risk")

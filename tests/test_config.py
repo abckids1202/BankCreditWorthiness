@@ -13,3 +13,10 @@ def test_invalid_config_threshold_order_is_rejected():
     config["thresholds"]["decline_min_risk"] = 0.2
     with pytest.raises(ValueError, match="thresholds"):
         validate_config(config)
+
+
+def test_missing_policy_version_is_rejected():
+    config = load_config()
+    config["policy_version"] = ""
+    with pytest.raises(ValueError, match="policy_version"):
+        validate_config(config)

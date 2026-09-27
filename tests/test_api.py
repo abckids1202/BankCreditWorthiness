@@ -55,6 +55,7 @@ def test_batch_prediction_endpoint():
     assert response.status_code == 200
     assert response.json()["count"] == 2
     assert len(response.json()["predictions"]) == 2
+    assert response.json()["predictions"][0]["policy_version"] == "policy-0.1.0"
 
 
 def test_out_of_distribution_input_is_reviewed():

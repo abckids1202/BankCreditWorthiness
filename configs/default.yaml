@@ -1,4 +1,5 @@
 random_state: 42
+policy_version: "policy-0.1.0"
 test_size: 0.20
 validation_size: 0.20
 thresholds:

@@ -86,6 +86,7 @@ class Prediction(BaseModel):
     rationale: str
     decision_thresholds: dict[str, float]
     model_version: str
+    policy_version: str
     reason_codes: list[str]
     explanations: list[dict]
     warnings: list[str]
@@ -113,6 +114,7 @@ class DatasetPrediction(BaseModel):
     risk_band: str
     decision: str
     model_version: str
+    policy_version: str
     warnings: list[str]
     educational_disclaimer: str
 
@@ -228,7 +230,7 @@ def predict(applicant: Applicant, request: Request):
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
     score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
     prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None))
-    return Prediction(risk_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+    return Prediction(risk_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/predict/batch", response_model=BatchPredictionResponse)
@@ -250,7 +252,7 @@ def predict_alternate(dataset: str, request: DatasetPredictionRequest):
         decision = decide(probability)
     except (KeyError, ValueError, TypeError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
+    return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], policy_version=metadata.get("policy_version", "alternate-experiment-0.1.0"), warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/review-cases")
