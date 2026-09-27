@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
@@ -14,6 +15,7 @@ from .features import engineer_features
 from .policy import decide
 from .scoring import probability_to_score, risk_band
 from .review import ReviewStore
+from .datasets import ADAPTERS
 
 
 ARTIFACT_DIR = Path("artifacts")
@@ -43,10 +45,35 @@ class Prediction(BaseModel):
     educational_disclaimer: str
 
 
+class DatasetPredictionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    features: dict[str, Any]
+
+
+class DatasetPrediction(BaseModel):
+    dataset: str
+    risk_probability: float
+    credit_score: int
+    risk_band: str
+    decision: str
+    model_version: str
+    warnings: list[str]
+    educational_disclaimer: str
+
+
 def _artifacts():
     model_path, metadata_path = ARTIFACT_DIR / "model.joblib", ARTIFACT_DIR / "metadata.json"
     if not model_path.exists() or not metadata_path.exists():
         raise HTTPException(503, "Model artifacts are unavailable. Run: python scripts/train.py")
+    return joblib.load(model_path), json.loads(metadata_path.read_text(encoding="utf-8"))
+
+
+def _dataset_artifacts(dataset: str):
+    if dataset not in ADAPTERS or dataset == "uci_default":
+        raise HTTPException(404, "Unknown alternate dataset")
+    model_path, metadata_path = ARTIFACT_DIR / dataset / "model.joblib", ARTIFACT_DIR / dataset / "metadata.json"
+    if not model_path.exists() or not metadata_path.exists():
+        raise HTTPException(503, f"Artifacts for {dataset} are unavailable. Run: python scripts/train.py --dataset {dataset}")
     return joblib.load(model_path), json.loads(metadata_path.read_text(encoding="utf-8"))
 
 
@@ -78,6 +105,22 @@ def predict(applicant: Applicant):
     warnings = ["Input contains an extreme value and was routed to review"] if outlier else []
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
     return Prediction(risk_probability=probability, credit_score=probability_to_score(probability, metadata["score"]), risk_band=risk_band(probability, metadata["risk_bands"]), decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+
+
+@app.post("/predict/{dataset}", response_model=DatasetPrediction)
+def predict_alternate(dataset: str, request: DatasetPredictionRequest):
+    model, metadata = _dataset_artifacts(dataset)
+    expected = set(metadata["feature_names"]); received = set(request.features)
+    missing, unknown = sorted(expected - received), sorted(received - expected)
+    if missing or unknown:
+        raise HTTPException(422, {"missing_features": missing, "unknown_features": unknown})
+    frame = pd.DataFrame([{name: request.features[name] for name in metadata["feature_names"]}])
+    try:
+        probability = float(np.clip(model.predict_proba(frame)[:, 1][0], 1e-6, 1 - 1e-6))
+        decision = decide(probability)
+    except (KeyError, ValueError, TypeError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/review-cases")

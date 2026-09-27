@@ -44,6 +44,15 @@ python scripts/train.py --dataset give_me_some_credit --output-dir artifacts/giv
 
 Those alternate artifacts are experiment outputs and are not wired into the current credit-card `/predict` contract, which intentionally remains schema-safe. The German Credit path has been verified end-to-end; Give Me Some Credit requires its Kaggle CSV first.
 
+After an alternate model is trained, it can be scored through a dataset-specific endpoint using a feature map:
+
+```text
+POST /predict/german_credit
+POST /predict/give_me_some_credit
+```
+
+The endpoint validates that the feature map exactly matches the trained schema. Alternate responses are educational experiment outputs and include a warning that their thresholds and explanations are not yet specialized to that dataset.
+
 The policy uses configurable thresholds: low risk is approved, high risk is declined, and the middle band goes to human review. Inputs outside the expected distribution should also be reviewed. Removing sensitive fields does not prove that a model is fair, so the training report includes group-level approval and error-rate summaries. The numeric score is a presentation layer based on calibrated probability and configurable odds parameters in `configs/default.yaml`; it is not a real-world bureau score.
 
 ## API example
