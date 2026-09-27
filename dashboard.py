@@ -137,6 +137,9 @@ with tabs[2]:
                 st.dataframe(pd.DataFrame(importance), use_container_width=True, hide_index=True)
         with fairness_tab:
             st.json(report.get("fairness_detailed", report.get("fairness", {})))
+            fairness_plot = Path("outputs/reports/fairness_threshold_sensitivity.png")
+            if fairness_plot.exists():
+                st.image(str(fairness_plot), caption="Approval-rate disparity under uniform threshold simulations")
             if report.get("fairness_threshold_sensitivity"):
                 st.subheader("Fairness threshold sensitivity")
                 st.caption("The same group metrics are recomputed at several policy bands; disparities can change when thresholds change.")

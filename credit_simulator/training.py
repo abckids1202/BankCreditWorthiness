@@ -189,6 +189,27 @@ def _plots(frame, y, probabilities, reports, threshold_rows=None, features=None,
         axis.set(xlabel="Decline threshold", ylabel="Population rate", title="Decision population by threshold"); axis.set_ylim(0, 1); axis.legend(); figure.tight_layout(); figure.savefig(reports / "threshold_comparison.png", dpi=140); plt.close(figure)
 
 
+def _fairness_threshold_plot(sensitivity: list[dict], reports: Path) -> None:
+    """Plot approval-rate disparity across the tested uniform policy bands."""
+    if not sensitivity:
+        return
+    labels = [f"{row['approve_max_risk']:.2f}/{row['decline_min_risk']:.2f}" for row in sensitivity]
+    figure, axis = plt.subplots(figsize=(8, 4))
+    plotted = False
+    columns = sorted({key.removesuffix("_comparisons") for row in sensitivity for key in row.get("metrics", {}) if key.endswith("_comparisons")})
+    for column in columns:
+        comparison_groups = sorted({group for row in sensitivity for group in row.get("metrics", {}).get(f"{column}_comparisons", {})})
+        for group in comparison_groups:
+            values = [row["metrics"].get(f"{column}_comparisons", {}).get(group, {}).get("demographic_parity_difference") for row in sensitivity]
+            if any(value is not None for value in values):
+                axis.plot(labels, values, marker="o", label=f"{column}: {group}")
+                plotted = True
+    if not plotted:
+        plt.close(figure)
+        return
+    axis.axhline(0, color="black", linewidth=0.8); axis.set(xlabel="Approve / decline thresholds", ylabel="Approval-rate difference vs reference", title="Fairness threshold sensitivity"); axis.legend(fontsize=8); figure.tight_layout(); figure.savefig(reports / "fairness_threshold_sensitivity.png", dpi=140); plt.close(figure)
+
+
 def _pipeline(kind: str, random_state: int, calibrated: bool = True):
     if kind == "logistic_regression":
         base = LogisticRegression(max_iter=1500, class_weight="balanced", random_state=random_state)
@@ -313,6 +334,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     pd.DataFrame(global_importance).to_csv(report_dir / "global_feature_importance.csv", index=False)
     (report_dir / "feature_summary.json").write_text(json.dumps(_data_quality(frame, features), indent=2, default=str), encoding="utf-8")
     (report_dir / "fairness_threshold_sensitivity.json").write_text(json.dumps(fairness_sensitivity, indent=2, default=str), encoding="utf-8")
+    _fairness_threshold_plot(fairness_sensitivity, report_dir)
     _plots(frame_test, y_test, test_probabilities, report_dir, threshold_rows=threshold_rows, features=features, config=config)
     plt.figure(figsize=(6, 4))
     order = np.argsort(test_probabilities)
