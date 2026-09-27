@@ -48,7 +48,7 @@ python scripts/train.py --dataset german_credit --output-dir artifacts/german_cr
 python scripts/train.py --dataset give_me_some_credit --output-dir artifacts/give_me_some_credit
 ```
 
-Those alternate artifacts are experiment outputs and are not wired into the current credit-card `/predict` contract, which intentionally remains schema-safe. Alternate training validates the feature schema, binary/non-null target, and target-leakage guard before fitting. The German Credit path has been verified end-to-end; Give Me Some Credit requires its Kaggle CSV first.
+Those alternate artifacts are experiment outputs and are not wired into the current credit-card `/predict` contract, which intentionally remains schema-safe. Protected fields in alternate adapters are retained for audit metadata but excluded from `feature_columns` before fitting. Alternate training validates the feature schema, binary/non-null target, protected-field separation, and target-leakage guard before fitting. The German Credit path has been verified end-to-end; Give Me Some Credit requires its Kaggle CSV first.
 
 Alternate training artifacts also receive reproducible fingerprints based on the dataset contents, schema, target, and random seed, allowing experiments to be compared without treating generated model binaries as source code. Each alternate output directory also receives a `training_report.json` with class balance, missingness/schema quality, and held-out metrics.
 

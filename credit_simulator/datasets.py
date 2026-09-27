@@ -39,6 +39,26 @@ class DatasetAdapter:
         missing = set(bundle.feature_columns) - set(bundle.frame.columns)
         if missing:
             raise ValueError(f"{self.name}: missing feature columns {sorted(missing)}")
+        protected_overlap = set(bundle.protected_attributes).intersection(bundle.feature_columns)
+        if protected_overlap:
+            raise ValueError(f"{self.name}: protected attributes cannot be model features: {sorted(protected_overlap)}")
+        if len(bundle.feature_columns) != len(set(bundle.feature_columns)):
+            raise ValueError(f"{self.name}: feature schema contains duplicate columns")
+
+    def target_definition(self, bundle: DatasetBundle) -> str:
+        return str(bundle.metadata.get("target_definition", bundle.target))
+
+    def feature_schema(self, bundle: DatasetBundle) -> dict[str, str]:
+        return {str(column): str(bundle.frame[column].dtype) for column in bundle.feature_columns}
+
+    def protected_attributes(self, bundle: DatasetBundle) -> list[str]:
+        return list(bundle.protected_attributes)
+
+    def source_metadata(self, bundle: DatasetBundle) -> dict:
+        return dict(bundle.metadata)
+
+    def split_strategy(self, bundle: DatasetBundle) -> str:
+        return bundle.split_strategy
 
 
 class UCIDefaultAdapter(DatasetAdapter):
@@ -68,8 +88,9 @@ class GermanCreditAdapter(DatasetAdapter):
             with ZipFile(archive_path) as archive:
                 member = next(name for name in archive.namelist() if name.endswith("german.data")); data_path.write_bytes(archive.read(member))
         frame = self.parse(data_path)
-        features = [column for column in frame.columns if column != "credit_risk"]
-        bundle = DatasetBundle(name=self.name, frame=frame, target="credit_risk", protected_attributes=["personal_status_sex", "age"], feature_columns=features, metadata={"source_url": "https://archive.ics.uci.edu/dataset/144/statlog%2Bgerman%2Bcredit%2Bdata", "license": "CC BY 4.0", "target_definition": "Bad credit risk according to the dataset label", "row_definition": "Credit application", "cost_matrix": "Misclassifying bad credit as good has higher cost"})
+        protected = ["personal_status_sex", "age"]
+        features = [column for column in frame.columns if column not in {"credit_risk", *protected}]
+        bundle = DatasetBundle(name=self.name, frame=frame, target="credit_risk", protected_attributes=protected, feature_columns=features, metadata={"source_url": "https://archive.ics.uci.edu/dataset/144/statlog%2Bgerman%2Bcredit%2Bdata", "license": "CC BY 4.0", "target_definition": "Bad credit risk according to the dataset label", "row_definition": "Credit application", "cost_matrix": "Misclassifying bad credit as good has higher cost"})
         self.validate(bundle); return bundle
 
 
@@ -85,8 +106,9 @@ class GiveMeSomeCreditAdapter(DatasetAdapter):
         if "SeriousDlqin2yrs" not in frame:
             raise ValueError("Give Me Some Credit file must contain SeriousDlqin2yrs")
         frame = frame.rename(columns={"SeriousDlqin2yrs": "default"})
-        features = [column for column in frame.columns if column not in {"default", "Unnamed: 0"}]
-        bundle = DatasetBundle(name=self.name, frame=frame, target="default", protected_attributes=["age"], feature_columns=features, metadata={"source_url": self.URL, "license": "Kaggle competition terms", "target_definition": "Serious delinquency 90 days or worse within two years", "row_definition": "Applicant record"})
+        protected = ["age"]
+        features = [column for column in frame.columns if column not in {"default", "Unnamed: 0", *protected}]
+        bundle = DatasetBundle(name=self.name, frame=frame, target="default", protected_attributes=protected, feature_columns=features, metadata={"source_url": self.URL, "license": "Kaggle competition terms", "target_definition": "Serious delinquency 90 days or worse within two years", "row_definition": "Applicant record"})
         self.validate(bundle); return bundle
 
 
