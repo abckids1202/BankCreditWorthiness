@@ -35,8 +35,13 @@ def test_review_store_migrates_existing_schema(tmp_path):
             credit_score INTEGER NOT NULL, automatic_decision TEXT NOT NULL, reason_codes_json TEXT NOT NULL,
             warnings_json TEXT NOT NULL, reviewer_decision TEXT, reviewer_note TEXT, reviewed_at TEXT
         )""")
+        connection.execute(
+            "INSERT INTO review_cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("legacy-case", "2026-01-01T00:00:00+00:00", "2026-01-01T00:00:00+00:00", "{}", "legacy", 0.2, 650, "approve", "[]", "[]", None, None, None),
+        )
 
     store = ReviewStore(database)
+    assert store.history("legacy-case")[0]["event_type"] == "created"
     case = store.create({"LIMIT_BAL": 1000}, {"model_version": "legacy-compatible", "risk_probability": 0.2, "credit_score": 650, "decision": "approve", "reason_codes": [], "warnings": []})
     assert case["policy_version"] == "unknown"
 

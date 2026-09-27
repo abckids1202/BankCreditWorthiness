@@ -26,6 +26,16 @@ class ReviewStore:
                 event_id TEXT PRIMARY KEY, case_id TEXT NOT NULL, event_type TEXT NOT NULL,
                 created_at TEXT NOT NULL, reviewer_decision TEXT, reviewer_note TEXT
             )""")
+            legacy_cases = connection.execute(
+                """SELECT c.case_id, c.created_at FROM review_cases AS c
+                   LEFT JOIN review_events AS e ON e.case_id = c.case_id
+                   WHERE e.case_id IS NULL"""
+            ).fetchall()
+            for case in legacy_cases:
+                connection.execute(
+                    "INSERT INTO review_events (event_id, case_id, event_type, created_at, reviewer_decision, reviewer_note) VALUES (?, ?, ?, ?, ?, ?)",
+                    (str(uuid.uuid4()), case[0], "created", case[1], None, None),
+                )
 
     def _connect(self):
         connection = sqlite3.connect(self.path)
