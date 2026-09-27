@@ -97,15 +97,14 @@ class Prediction(BaseModel):
     rationale: str
     decision_thresholds: dict[str, float]
     model_version: str
-    experiment_id: str = "unknown"
     policy_version: str
-    dataset_version: str
-    dataset_version: str = "unknown"
     reason_codes: list[str]
     explanations: list[dict]
     warnings: list[str]
-    fairness_warnings: list[str] = []
     educational_disclaimer: str
+    experiment_id: str = "unknown"
+    dataset_version: str = "unknown"
+    fairness_warnings: list[str] = Field(default_factory=list)
 
 
 class BatchPredictionRequest(BaseModel):
@@ -146,7 +145,6 @@ class ReviewCase(BaseModel):
     updated_at: str
     applicant: dict[str, Any]
     model_version: str
-    experiment_id: str = "unknown"
     policy_version: str
     decision_thresholds: dict[str, float]
     risk_probability: FiniteFloat = Field(ge=0, le=1)
@@ -154,8 +152,9 @@ class ReviewCase(BaseModel):
     automatic_decision: Literal["approve", "manual_review", "decline"]
     reason_codes: list[str]
     warnings: list[str]
-    fairness_warnings: list[str] = []
-    data_quality_warnings: list[str] = []
+    experiment_id: str = "unknown"
+    fairness_warnings: list[str] = Field(default_factory=list)
+    data_quality_warnings: list[str] = Field(default_factory=list)
     reviewer_decision: ReviewerDecision | None = None
     reviewer_note: str | None = None
     reviewer_id: str | None = None

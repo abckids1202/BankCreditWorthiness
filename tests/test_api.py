@@ -38,6 +38,19 @@ def test_prediction_response_schema_rejects_invalid_risk_and_score():
         api.Prediction(risk_probability=0.2, default_probability=0.2, credit_score=299, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
 
 
+def test_prediction_warning_defaults_are_independent_and_metadata_defaults_are_compatible():
+    fields = api.Prediction.model_fields
+    assert list(fields).count("dataset_version") == 1
+
+    first = api.Prediction(risk_probability=0.2, default_probability=0.2, credit_score=700, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
+    second = api.Prediction(risk_probability=0.2, default_probability=0.2, credit_score=700, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
+
+    assert first.dataset_version == "unknown"
+    assert first.experiment_id == "unknown"
+    first.fairness_warnings.append("audit warning")
+    assert second.fairness_warnings == []
+
+
 def test_ready_endpoint():
     response = TestClient(app).get("/ready")
     assert response.status_code == 200
