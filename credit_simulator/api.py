@@ -347,6 +347,11 @@ def predict(applicant: Applicant, request: Request):
     raw_frame = pd.DataFrame([{name: payload[name] for name in raw_features}])
     frame = engineer_features(raw_frame)
     features = metadata["feature_names"]
+    imputed_features = [
+        feature
+        for feature in features
+        if feature in frame and bool(pd.isna(frame[feature].iloc[0]))
+    ]
     try:
         probability = float(np.clip(model.predict_proba(frame[features])[:, 1][0], 1e-6, 1 - 1e-6))
         z_values = []
@@ -357,7 +362,14 @@ def predict(applicant: Applicant, request: Request):
         decision = decide(probability, out_of_distribution=outlier, **{key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")})
     except (KeyError, ValueError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    warnings = ["Input is outside the training distribution and was routed to review"] if outlier else []
+    warnings = []
+    if imputed_features:
+        warnings.append(
+            "One or more engineered features were missing or undefined; "
+            "the model imputed them before scoring"
+        )
+    if outlier:
+        warnings.append("Input is outside the training distribution and was routed to review")
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
     score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
     prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None), metadata.get("policy_version", "unknown"), _dataset_version(metadata))
