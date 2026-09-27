@@ -135,10 +135,13 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     test_metrics = _metrics(y_test, test_probabilities)
     calibration = _calibration(y_test, test_probabilities)
     threshold_rows = _threshold_report(y_test, test_probabilities, config)
-    joblib.dump(selected, output / "model.joblib")
     dataset_hash = hashlib.sha256(frame.to_csv(index=False).encode("utf-8")).hexdigest()
+    version_payload = json.dumps({"dataset_sha256": dataset_hash, "config": config, "selected_model": selected_name}, sort_keys=True, default=str).encode("utf-8")
+    artifact_fingerprint = hashlib.sha256(version_payload).hexdigest()[:12]
+    model_version = f"0.3.0+{artifact_fingerprint}"
+    joblib.dump(selected, output / "model.joblib")
     feature_stats = {name: {"mean": float(X_train[name].mean()), "std": float(max(X_train[name].std(), 1e-9))} for name in features if pd.api.types.is_numeric_dtype(X_train[name])}
-    metadata = {"model_version": "0.2.0", "selected_model": selected_name, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": engineered_feature_descriptions(), "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
+    metadata = {"model_version": model_version, "artifact_fingerprint": artifact_fingerprint, "selected_model": selected_name, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": engineered_feature_descriptions(), "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     fairness_frame = frame_test.copy()
     fairness_frame["AGE_BIN"] = pd.cut(fairness_frame["AGE"], bins=[0, 25, 35, 50, np.inf], labels=["<=25", "26-35", "36-50", "51+"])
