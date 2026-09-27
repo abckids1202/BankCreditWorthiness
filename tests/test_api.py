@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 import credit_simulator.api as api
 from credit_simulator.api import app
@@ -24,6 +25,13 @@ def test_malformed_request_id_is_replaced():
     assert response.status_code == 200
     assert response.headers["X-Request-ID"] != supplied
     assert len(response.headers["X-Request-ID"]) == 36
+
+
+def test_prediction_response_schema_rejects_invalid_risk_and_score():
+    with pytest.raises(ValueError):
+        api.Prediction(risk_probability=float("nan"), credit_score=600, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
+    with pytest.raises(ValueError):
+        api.Prediction(risk_probability=0.2, credit_score=299, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
 
 
 def test_ready_endpoint():

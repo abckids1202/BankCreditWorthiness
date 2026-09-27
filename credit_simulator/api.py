@@ -84,8 +84,8 @@ class Applicant(BaseModel):
 
 
 class Prediction(BaseModel):
-    risk_probability: float
-    credit_score: int
+    risk_probability: FiniteFloat = Field(ge=0, le=1)
+    credit_score: int = Field(ge=300, le=850)
     risk_band: str
     decision: str
     rationale: str
@@ -114,8 +114,8 @@ class DatasetPredictionRequest(BaseModel):
 
 class DatasetPrediction(BaseModel):
     dataset: str
-    risk_probability: float
-    credit_score: int
+    risk_probability: FiniteFloat = Field(ge=0, le=1)
+    credit_score: int = Field(ge=300, le=850)
     risk_band: str
     decision: str
     model_version: str
@@ -135,8 +135,8 @@ class ReviewCase(BaseModel):
     model_version: str
     policy_version: str
     decision_thresholds: dict[str, float]
-    risk_probability: float
-    credit_score: int
+    risk_probability: FiniteFloat = Field(ge=0, le=1)
+    credit_score: int = Field(ge=300, le=850)
     automatic_decision: Literal["approve", "manual_review", "decline"]
     reason_codes: list[str]
     warnings: list[str]
