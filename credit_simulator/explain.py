@@ -66,7 +66,6 @@ def structured_reasons(model, frame: pd.DataFrame, feature_names: list[str], des
     descriptions = descriptions or {}
     reasons = []
     for index in ranked:
-        direction = "increased" if contributions[index] > 0 else "reduced"
         reasons.append({"feature": feature_names[index], "description": descriptions.get(feature_names[index], feature_names[index]), "value": None if pd.isna(values[index]) else float(values[index]), "direction": "increased_risk" if contributions[index] > 0 else "reduced_risk", "importance": float(abs(contributions[index]))})
     return reasons
 
