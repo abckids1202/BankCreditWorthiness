@@ -34,6 +34,28 @@ def _metrics(y_true, probabilities, threshold=0.5):
     return {"roc_auc": float(roc_auc_score(y_true, probabilities)), "pr_auc": float(average_precision_score(y_true, probabilities)), "log_loss": float(log_loss(y_true, probabilities, labels=[0, 1])), "brier_score": float(brier_score_loss(y_true, probabilities)), "accuracy": float(accuracy_score(y_true, predicted)), "precision": float(precision_score(y_true, predicted, zero_division=0)), "recall": float(recall_score(y_true, predicted, zero_division=0)), "f1": float(f1_score(y_true, predicted, zero_division=0)), "specificity": float(tn / max(tn + fp, 1)), "balanced_accuracy": float(balanced_accuracy_score(y_true, predicted)), "confusion_matrix": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)}}
 
 
+def _bootstrap_intervals(y_true, probabilities, random_state=42, n_bootstrap=200):
+    actual = np.asarray(y_true).astype(int)
+    scores = np.asarray(probabilities, dtype=float)
+    rng = np.random.default_rng(random_state)
+    samples = {"roc_auc": [], "pr_auc": [], "brier_score": []}
+    for _ in range(n_bootstrap):
+        indices = rng.integers(0, len(actual), len(actual))
+        sampled_y, sampled_scores = actual[indices], scores[indices]
+        if np.unique(sampled_y).size < 2:
+            continue
+        samples["roc_auc"].append(roc_auc_score(sampled_y, sampled_scores))
+        samples["pr_auc"].append(average_precision_score(sampled_y, sampled_scores))
+        samples["brier_score"].append(brier_score_loss(sampled_y, sampled_scores))
+    intervals = {}
+    for metric, values in samples.items():
+        if not values:
+            intervals[metric] = {"estimate": None, "lower_95": None, "upper_95": None}
+        else:
+            intervals[metric] = {"estimate": float(np.mean(values)), "lower_95": float(np.percentile(values, 2.5)), "upper_95": float(np.percentile(values, 97.5))}
+    return {"n_bootstrap": int(n_bootstrap), "successful_samples": int(len(samples["roc_auc"])), "metrics": intervals}
+
+
 def _calibration(y_true, probabilities, bins=10):
     edges = np.linspace(0, 1, bins + 1); rows = []
     for left, right in zip(edges[:-1], edges[1:]):
@@ -197,6 +219,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     selected = candidates[selected_name]
     test_probabilities = selected.predict_proba(X_test)[:, 1]
     test_metrics = _metrics(y_test, test_probabilities)
+    bootstrap = _bootstrap_intervals(y_test, test_probabilities, config["random_state"])
     calibration = _calibration(y_test, test_probabilities)
     threshold_rows = _threshold_report(y_test, test_probabilities, config)
     approval_rate_rows = _approval_rate_report(y_test, test_probabilities)
@@ -208,13 +231,13 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     model_version = f"0.3.0+{artifact_fingerprint}"
     joblib.dump(selected, output / "model.joblib")
     feature_stats = {name: {"mean": float(X_train[name].mean()), "std": float(max(X_train[name].std(), 1e-9))} for name in features if pd.api.types.is_numeric_dtype(X_train[name])}
-    metadata = {"model_version": model_version, "artifact_fingerprint": artifact_fingerprint, "selected_model": selected_name, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
+    metadata = {"model_version": model_version, "artifact_fingerprint": artifact_fingerprint, "selected_model": selected_name, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "test_metric_bootstrap": bootstrap, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     fairness_frame = frame_test.copy()
     fairness_frame["AGE_BIN"] = pd.cut(fairness_frame["AGE"], bins=[0, 25, 35, 50, np.inf], labels=["<=25", "26-35", "36-50", "51+"])
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
     fairness_detailed = group_metrics(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], config["thresholds"]["approve_max_risk"], config["thresholds"]["decline_min_risk"])
-    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed}
+    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     register_model(metadata, output)
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")

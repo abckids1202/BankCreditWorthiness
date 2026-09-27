@@ -90,6 +90,10 @@ with tabs[2]:
         metric_tab, visual_tab, fairness_tab, calibration_tab = st.tabs(["Metrics", "Visual diagnostics", "Fairness", "Calibration"])
         with metric_tab:
             st.json({"selected_model": report.get("selected_model"), "candidate_metrics": report.get("candidate_metrics"), "test_metrics": report.get("test_metrics")})
+            if report.get("test_metric_bootstrap"):
+                st.subheader("Held-out metric uncertainty")
+                st.caption("Bootstrap 95% intervals show sampling uncertainty in the test split; they are not a guarantee of future performance.")
+                st.json(report["test_metric_bootstrap"])
         with visual_tab:
             st.caption("These diagnostics describe the held-out test split and the configured policy. They are evidence for learning and review, not lending decisions.")
             image_columns = st.columns(2)
