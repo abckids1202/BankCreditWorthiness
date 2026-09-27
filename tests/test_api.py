@@ -33,9 +33,9 @@ def test_malformed_request_id_is_replaced():
 
 def test_prediction_response_schema_rejects_invalid_risk_and_score():
     with pytest.raises(ValueError):
-        api.Prediction(risk_probability=float("nan"), credit_score=600, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
+        api.Prediction(risk_probability=float("nan"), default_probability=float("nan"), credit_score=600, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
     with pytest.raises(ValueError):
-        api.Prediction(risk_probability=0.2, credit_score=299, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
+        api.Prediction(risk_probability=0.2, default_probability=0.2, credit_score=299, risk_band="low", decision="approve", rationale="test", decision_thresholds={}, model_version="test", policy_version="test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
 
 
 def test_ready_endpoint():
@@ -92,6 +92,7 @@ def test_batch_prediction_endpoint():
     assert len(response.json()["predictions"]) == 2
     assert response.json()["predictions"][0]["policy_version"] == "policy-0.1.0"
     assert len(response.json()["predictions"][0]["dataset_version"]) == 64
+    assert response.json()["predictions"][0]["default_probability"] == response.json()["predictions"][0]["risk_probability"]
 
 
 def test_out_of_distribution_input_is_reviewed():
@@ -103,7 +104,7 @@ def test_out_of_distribution_input_is_reviewed():
 
 def test_review_queue_rejects_non_manual_recommendations(monkeypatch):
     applicant = {"LIMIT_BAL": 50000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
-    prediction = api.Prediction(risk_probability=0.1, credit_score=750, risk_band="low", decision="approve", rationale="low risk", decision_thresholds={"approve_max_risk": 0.2, "decline_min_risk": 0.45}, model_version="test", policy_version="policy-test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
+    prediction = api.Prediction(risk_probability=0.1, default_probability=0.1, credit_score=750, risk_band="low", decision="approve", rationale="low risk", decision_thresholds={"approve_max_risk": 0.2, "decline_min_risk": 0.45}, model_version="test", policy_version="policy-test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
     monkeypatch.setattr(api, "predict", lambda applicant, request: prediction)
     response = TestClient(app).post("/review-cases", json=applicant)
     assert response.status_code == 422

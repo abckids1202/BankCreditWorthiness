@@ -56,7 +56,7 @@ with tabs[0]:
     if result:
         score_col, risk_col, decision_col = st.columns(3)
         score_col.metric("Credit score", result["credit_score"])
-        risk_col.metric("Default risk", f"{result['risk_probability']:.1%}")
+        risk_col.metric("Default risk", f"{result.get('default_probability', result['risk_probability']):.1%}")
         decision_col.metric("Recommendation", result["decision"].replace("_", " ").title())
         st.caption(f"Risk band: {result['risk_band']} | Model: {result['model_version']} | Policy: {result.get('policy_version', 'unknown')}")
         st.info(result["rationale"])
