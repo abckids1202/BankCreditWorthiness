@@ -131,6 +131,10 @@ with tabs[3]:
         metric_tab, visual_tab, fairness_tab, calibration_tab, registry_tab = st.tabs(["Metrics", "Visual diagnostics", "Fairness", "Calibration", "Registry"])
         with metric_tab:
             st.json({"selected_model": report.get("selected_model"), "candidate_metrics": report.get("candidate_metrics"), "test_metrics": report.get("test_metrics")})
+            manifest_path = Path("outputs/reports/report_manifest.json")
+            if manifest_path.exists():
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                st.caption(f"This training run generated {manifest.get('file_count', 0)} report artifacts; experiment {manifest.get('experiment_id', 'unknown')}.")
             if report.get("test_metric_bootstrap"):
                 st.subheader("Held-out metric uncertainty")
                 st.caption("Bootstrap 95% intervals show sampling uncertainty in the test split; they are not a guarantee of future performance.")
@@ -162,6 +166,10 @@ with tabs[3]:
                 st.caption("Permutation importance measures the change in held-out ROC-AUC when a feature is shuffled. It describes model behavior, not causality.")
                 st.dataframe(pd.DataFrame(importance), use_container_width=True, hide_index=True)
         with fairness_tab:
+            governance = report.get("fairness_governance")
+            if governance:
+                st.warning("Fairness results are audit diagnostics only. The default policy is uniform, and excluding protected fields does not eliminate proxy discrimination.")
+                st.json(governance)
             st.json(report.get("fairness_detailed", report.get("fairness", {})))
             fairness_plot = Path("outputs/reports/fairness_threshold_sensitivity.png")
             if fairness_plot.exists():
