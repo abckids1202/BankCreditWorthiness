@@ -30,6 +30,9 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     assert (tmp_path / "artifact" / "threshold_analysis.csv").exists()
     assert (tmp_path / "artifact" / "calibration.json").exists()
     assert (tmp_path / "artifact" / "fairness.json").exists()
+    manifest = __import__("json").loads((tmp_path / "artifact" / "report_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["experiment_id"] == metadata["experiment_id"]
+    assert "training_report.json" in manifest["files"]
 
 
 def test_generic_trainer_version_is_reproducible(tmp_path):

@@ -351,6 +351,9 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     plt.plot(np.linspace(0.05, 0.95, len(rolling)), rolling, marker="o")
     plt.xlabel("Risk-score decile"); plt.ylabel("Observed default rate"); plt.title("Reliability by score decile"); plt.tight_layout()
     plt.savefig(reports / "reliability.png", dpi=140); plt.close()
+    report_files = sorted(path.name for path in report_dir.iterdir() if path.is_file()) + ["report_manifest.json"]
+    manifest = {"schema_version": "1.0", "experiment_id": experiment_id, "generated_at": training_timestamp, "report_directory": str(report_dir), "file_count": len(report_files), "files": report_files}
+    (report_dir / "report_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return metadata
 
 
