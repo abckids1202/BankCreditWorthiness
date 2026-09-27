@@ -36,7 +36,7 @@ def show_request_error(error):
 
 
 defaults = {"LIMIT_BAL": 50000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
-tabs = st.tabs(["Applicant scoring", "Threshold simulator", "Model evidence", "Review queue", "Drift monitoring"])
+tabs = st.tabs(["Applicant scoring", "Score explanation", "Threshold simulator", "Model metrics", "Feature distributions", "Fairness analysis", "Review queue", "Monitoring"])
 
 with tabs[0]:
     st.subheader("Score an educational sample applicant")
@@ -77,6 +77,23 @@ with tabs[0]:
                 show_request_error(exc)
 
 with tabs[1]:
+    st.subheader("Applicant explanation")
+    explanation_result = st.session_state.get("prediction")
+    if explanation_result:
+        st.caption("These are technical model explanations, not causal explanations or legal adverse-action notices.")
+        st.metric("Modeled default risk", f"{explanation_result.get('default_probability', explanation_result['risk_probability']):.1%}")
+        st.json(explanation_result.get("explanations", []))
+        st.subheader("Reason codes")
+        for reason in explanation_result.get("reason_codes", []):
+            st.write(f"• {reason}")
+        for warning in explanation_result.get("warnings", []):
+            st.warning(warning)
+        for warning in explanation_result.get("fairness_warnings", []):
+            st.info(warning)
+    else:
+        st.info("Score an applicant in the Applicant scoring tab to see its explanation.")
+
+with tabs[2]:
     st.subheader("Research-only policy simulator")
     st.caption("This changes only the simulation output; it never changes the configured automatic policy.")
     try:
@@ -106,7 +123,7 @@ with tabs[1]:
             st.json(api_request("POST", "/policy/simulate", json={"probabilities": probabilities, "actual_defaults": actual, "approve_max_risk": approve, "decline_min_risk": decline, "costs": {"approve_default": approve_default_cost, "decline_good": decline_good_cost, "manual_review": manual_review_cost}, "audit_groups": audit_groups}))
         except (ValueError, requests.RequestException) as exc:
             show_request_error(exc)
-with tabs[2]:
+with tabs[3]:
     st.subheader("Model evidence")
     report_path = Path("outputs/reports/training_report.json")
     if report_path.exists():
@@ -173,7 +190,36 @@ with tabs[2]:
     else:
         st.info("Run python scripts/train.py to generate model evidence.")
 
-with tabs[3]:
+with tabs[4]:
+    st.subheader("Feature distributions")
+    report_path = Path("outputs/reports/training_report.json")
+    if report_path.exists():
+        feature_report = json.loads(report_path.read_text(encoding="utf-8"))
+        feature_summary = feature_report.get("feature_summary") or feature_report.get("data_quality", {}).get("feature_summary")
+        if feature_summary:
+            st.dataframe(pd.DataFrame.from_dict(feature_summary, orient="index"), use_container_width=True)
+        image = Path("outputs/reports/feature_distributions.png")
+        if image.exists():
+            st.image(str(image), caption="Training feature distributions", use_container_width=True)
+        else:
+            st.info("Feature distribution plot is not available; inspect the tabular summary above.")
+    else:
+        st.info("Run python scripts/train.py to generate feature distributions.")
+
+with tabs[5]:
+    st.subheader("Fairness analysis")
+    st.caption("Protected attributes are used only for group-level auditing. They are not model inputs and do not create group-specific automatic thresholds.")
+    report_path = Path("outputs/reports/training_report.json")
+    if report_path.exists():
+        fairness_report = json.loads(report_path.read_text(encoding="utf-8"))
+        st.json(fairness_report.get("fairness_detailed", fairness_report.get("fairness", {})))
+        fairness_plot = Path("outputs/reports/fairness_threshold_sensitivity.png")
+        if fairness_plot.exists():
+            st.image(str(fairness_plot), caption="Fairness threshold sensitivity", use_container_width=True)
+    else:
+        st.info("Run python scripts/train.py to generate the fairness report.")
+
+with tabs[6]:
     st.subheader("Human review queue")
     try:
         cases = api_request("GET", "/review-cases")
@@ -198,7 +244,7 @@ with tabs[3]:
     except requests.RequestException as exc:
         show_request_error(exc)
 
-with tabs[4]:
+with tabs[7]:
     st.subheader("Input drift monitoring")
     st.caption("Provide reference and current records as JSON arrays. Critical drift should be investigated before automated use.")
     reference_text = st.text_area("Reference records", '[{"LIMIT_BAL": 10000}, {"LIMIT_BAL": 20000}]')
