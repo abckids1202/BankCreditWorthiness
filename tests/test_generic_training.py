@@ -17,6 +17,7 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     assert metadata["metrics_test"]["roc_auc"] >= 0
     assert len(metadata["training_config_sha256"]) == 64
     assert metadata["runtime"]["scikit_learn"]
+    assert metadata["schema_version"] == "1.0"
 
 
 def test_generic_trainer_version_is_reproducible(tmp_path):

@@ -214,7 +214,7 @@ def _artifacts():
     try:
         model = joblib.load(model_path)
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        required = {"model_version", "policy_version", "artifact_fingerprint", "training_config_sha256", "feature_names", "raw_feature_names", "thresholds", "score", "risk_bands", "feature_stats", "disclaimer", "model_sha256"}
+        required = {"schema_version", "model_version", "policy_version", "artifact_fingerprint", "training_config_sha256", "feature_names", "raw_feature_names", "thresholds", "score", "risk_bands", "feature_stats", "disclaimer", "model_sha256"}
         checksum = hashlib.sha256(model_path.read_bytes()).hexdigest()
         if not isinstance(metadata, dict) or not required.issubset(metadata) or metadata["model_sha256"] != checksum or not hasattr(model, "predict_proba"):
             raise ValueError("missing required model metadata or prediction interface")
@@ -233,7 +233,7 @@ def _dataset_artifacts(dataset: str):
         model = joblib.load(model_path)
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         checksum = hashlib.sha256(model_path.read_bytes()).hexdigest()
-        required = {"model_sha256", "model_version", "feature_names", "disclaimer", "dataset", "policy_version"}
+        required = {"schema_version", "model_sha256", "model_version", "feature_names", "disclaimer", "dataset", "policy_version"}
         if not isinstance(metadata, dict) or not required.issubset(metadata) or metadata["model_sha256"] != checksum or not hasattr(model, "predict_proba"):
             raise ValueError("missing required alternate model metadata or prediction interface")
         return model, metadata
@@ -256,7 +256,7 @@ def health():
 @app.get("/ready")
 def ready():
     _, metadata = _artifacts()
-    return {"status": "ready", "model_version": metadata["model_version"], "policy_version": metadata.get("policy_version", "unknown"), "artifact_fingerprint": metadata.get("artifact_fingerprint", "unknown"), "training_config_sha256": metadata.get("training_config_sha256", "unknown")}
+    return {"status": "ready", "schema_version": metadata["schema_version"], "model_version": metadata["model_version"], "policy_version": metadata.get("policy_version", "unknown"), "artifact_fingerprint": metadata.get("artifact_fingerprint", "unknown"), "training_config_sha256": metadata.get("training_config_sha256", "unknown")}
 
 
 @app.post("/policy/simulate")

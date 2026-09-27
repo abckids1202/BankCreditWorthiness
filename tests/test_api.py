@@ -44,6 +44,7 @@ def test_ready_endpoint():
     assert response.json()["status"] == "ready"
     assert response.json()["policy_version"] == "policy-0.1.0"
     assert response.json()["artifact_fingerprint"]
+    assert response.json()["schema_version"] == "1.0"
 
 
 def test_ready_endpoint_reports_invalid_artifacts(monkeypatch, tmp_path):
