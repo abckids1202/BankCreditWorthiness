@@ -4,6 +4,7 @@ import json
 import hashlib
 import logging
 import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -34,11 +35,13 @@ prediction_store = PredictionEventStore()
 rate_limiter = RateLimiter()
 app = FastAPI(title="Explainable Credit Approval Simulator", version="0.1.0", description="Educational prototype only; not for real lending decisions.")
 logger = logging.getLogger("credit_simulator.api")
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
 @app.middleware("http")
 async def request_context(request, call_next):
-    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    supplied_request_id = request.headers.get("X-Request-ID")
+    request_id = supplied_request_id if supplied_request_id and _REQUEST_ID_PATTERN.fullmatch(supplied_request_id) else str(uuid.uuid4())
     request.state.request_id = request_id
     started = time.perf_counter()
     configured_key = os.getenv("CREDIT_API_KEY")

@@ -18,6 +18,14 @@ def test_request_id_is_preserved():
     assert response.headers["X-Request-ID"] == "test-request"
 
 
+def test_malformed_request_id_is_replaced():
+    supplied = "x" * 129
+    response = TestClient(app).get("/health", headers={"X-Request-ID": supplied})
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] != supplied
+    assert len(response.headers["X-Request-ID"]) == 36
+
+
 def test_ready_endpoint():
     response = TestClient(app).get("/ready")
     assert response.status_code == 200
