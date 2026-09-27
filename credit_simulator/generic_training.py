@@ -24,6 +24,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from .datasets import DatasetBundle
+from .data import suspicious_leakage_columns
 from .fairness import group_metrics
 from .policy import simulate_thresholds
 from .registry import register_model
@@ -112,7 +113,10 @@ def train_tabular(bundle: DatasetBundle, output_dir: str | Path, random_state: i
     missing_features = sorted(set(features).difference(bundle.frame.columns))
     if missing_features or not features:
         raise ValueError(f"Alternate dataset feature schema is invalid: {missing_features or 'no model features'}")
-    suspicious = [name for name in features if str(name).lower() in {"target", "label", "default"} or str(name).lower() == str(bundle.target).lower()]
+    suspicious = suspicious_leakage_columns(features)
+    if str(bundle.target).lower() in {str(name).lower() for name in features}:
+        suspicious.append(bundle.target)
+    suspicious = sorted(set(suspicious), key=str)
     if suspicious:
         raise ValueError(f"Potential target leakage in alternate model features: {suspicious}")
     target = pd.to_numeric(bundle.frame[bundle.target], errors="coerce")

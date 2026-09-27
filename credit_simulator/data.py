@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+import re
 from zipfile import ZipFile
 
 import pandas as pd
@@ -79,8 +80,18 @@ def validate_frame(frame: pd.DataFrame) -> None:
         raise ValueError("Dataset is too small for a reliable train/test split")
 
 
+def suspicious_leakage_columns(features: list[str]) -> list[str]:
+    markers = ("target", "label", "outcome", "default", "future", "postapproval", "post_approval")
+    suspicious = []
+    for name in features:
+        normalized = re.sub(r"[^a-z0-9]+", "", str(name).lower())
+        if any(marker in normalized for marker in markers):
+            suspicious.append(name)
+    return suspicious
+
+
 def validate_no_leakage(features: list[str]) -> None:
-    suspicious = [name for name in features if "default.payment" in name.lower() or name.lower() in {"target", "label"}]
+    suspicious = suspicious_leakage_columns(features)
     if suspicious:
         raise ValueError(f"Potential target leakage in model features: {suspicious}")
 

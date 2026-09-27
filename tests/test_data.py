@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from credit_simulator.data import model_features, validate_frame
+from credit_simulator.data import model_features, suspicious_leakage_columns, validate_frame, validate_no_leakage
 
 
 def test_sensitive_columns_are_not_model_features():
@@ -50,3 +50,10 @@ def test_non_numeric_balance_is_rejected():
 
 def test_valid_domains_are_accepted():
     validate_frame(_valid_frame())
+
+
+def test_leakage_guard_catches_target_proxies_and_allows_repayment_history():
+    assert suspicious_leakage_columns(["PAY_0", "future_default_flag", "post_approval_status"]) == ["future_default_flag", "post_approval_status"]
+    validate_no_leakage(["PAY_0", "BILL_AMT1", "late_payment_count"])
+    with pytest.raises(ValueError, match="leakage"):
+        validate_no_leakage(["PAY_0", "default_outcome"])
