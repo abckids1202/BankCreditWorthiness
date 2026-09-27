@@ -9,6 +9,7 @@ def test_fairness_reports_group_comparisons():
     assert "group_comparisons" in report
     assert "b" in report["group_comparisons"]
     assert "approval_rate_ratio" in report["group_comparisons"]["b"]
+    assert report["group_comparisons"]["b"]["demographic_parity_difference"] == report["group_comparisons"]["b"]["approval_rate_difference"]
 
 
 def test_fairness_threshold_sensitivity_returns_each_policy_band():

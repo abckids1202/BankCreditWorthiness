@@ -23,7 +23,9 @@ def group_metrics(frame, y_true, probabilities, protected_columns, approve_max_r
             base = groups_report[reference]
             for group, values in groups_report.items():
                 if group != reference:
-                    report[column + "_comparisons"][group] = {"reference_group": reference, "approval_rate_difference": values["approval_rate"] - base["approval_rate"], "approval_rate_ratio": values["approval_rate"] / max(base["approval_rate"], 1e-9), "equal_opportunity_difference": values["true_positive_rate"] - base["true_positive_rate"], "false_positive_rate_difference": values["false_positive_rate"] - base["false_positive_rate"], "false_negative_rate_difference": values["false_negative_rate"] - base["false_negative_rate"], "calibration_error_difference": values["calibration_error"] - base["calibration_error"]}
+                    approval_difference = values["approval_rate"] - base["approval_rate"]
+                    approval_ratio = values["approval_rate"] / max(base["approval_rate"], 1e-9)
+                    report[column + "_comparisons"][group] = {"reference_group": reference, "approval_rate_difference": approval_difference, "approval_rate_ratio": approval_ratio, "demographic_parity_difference": approval_difference, "demographic_parity_ratio": approval_ratio, "equal_opportunity_difference": values["true_positive_rate"] - base["true_positive_rate"], "false_positive_rate_difference": values["false_positive_rate"] - base["false_positive_rate"], "false_negative_rate_difference": values["false_negative_rate"] - base["false_negative_rate"], "calibration_error_difference": values["calibration_error"] - base["calibration_error"]}
     return report
 
 
