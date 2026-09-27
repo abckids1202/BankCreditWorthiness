@@ -260,6 +260,7 @@ def test_current_policy_endpoint_separates_policy_from_model():
     assert payload["policy_version"] == "policy-0.1.0"
     assert payload["decision_thresholds"]["approve_max_risk"] < payload["decision_thresholds"]["decline_min_risk"]
     assert "low" in payload["risk_bands"]
+    assert payload["decision_costs"]["approve_default"] == 5.0
 
 
 def test_monitoring_drift_endpoint():

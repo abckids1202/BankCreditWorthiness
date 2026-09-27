@@ -201,6 +201,7 @@ class CurrentPolicy(BaseModel):
     policy_version: str
     decision_thresholds: dict[str, FiniteFloat]
     risk_bands: dict[str, FiniteFloat]
+    decision_costs: dict[str, FiniteFloat]
 
 
 class DriftRequest(BaseModel):
@@ -341,7 +342,8 @@ def policy_simulation(request: ThresholdSimulationRequest):
 @app.get("/policy/current", response_model=CurrentPolicy)
 def current_policy():
     _, metadata = _artifacts()
-    return CurrentPolicy(policy_version=metadata.get("policy_version", "unknown"), decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, risk_bands=metadata["risk_bands"])
+    decision_costs = metadata.get("training_config", {}).get("costs", {"approve_default": 5.0, "decline_good": 1.0, "manual_review": 0.2})
+    return CurrentPolicy(policy_version=metadata.get("policy_version", "unknown"), decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, risk_bands=metadata["risk_bands"], decision_costs=decision_costs)
 
 
 @app.post("/monitoring/drift")

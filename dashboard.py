@@ -100,9 +100,11 @@ with tabs[2]:
     try:
         active_policy = api_request("GET", "/policy/current")
         active_thresholds = active_policy["decision_thresholds"]
+        active_costs = active_policy.get("decision_costs", {"approve_default": 5.0, "decline_good": 1.0, "manual_review": 0.2})
         st.caption(f"Active policy: {active_policy['policy_version']} | approve ≤ {active_thresholds['approve_max_risk']:.2f} | decline ≥ {active_thresholds['decline_min_risk']:.2f}")
     except requests.RequestException:
         active_thresholds = {"approve_max_risk": 0.20, "decline_min_risk": 0.45}
+        active_costs = {"approve_default": 5.0, "decline_good": 1.0, "manual_review": 0.2}
         st.warning("Could not load the active policy; simulator defaults are shown.")
     probabilities_text = st.text_area("Predicted probabilities, comma-separated", "0.05, 0.12, 0.28, 0.51, 0.74")
     defaults_text = st.text_input("Optional actual defaults, comma-separated 0/1", "")
@@ -111,11 +113,11 @@ with tabs[2]:
     decline = st.slider("Decline at or above", 0.0, 1.0, float(active_thresholds["decline_min_risk"]), 0.01)
     cost_columns = st.columns(3)
     with cost_columns[0]:
-        approve_default_cost = st.number_input("Cost: approve a default", min_value=0.0, value=5.0, step=0.5)
+        approve_default_cost = st.number_input("Cost: approve a default", min_value=0.0, value=float(active_costs["approve_default"]), step=0.5)
     with cost_columns[1]:
-        decline_good_cost = st.number_input("Cost: decline a non-default", min_value=0.0, value=1.0, step=0.5)
+        decline_good_cost = st.number_input("Cost: decline a non-default", min_value=0.0, value=float(active_costs["decline_good"]), step=0.5)
     with cost_columns[2]:
-        manual_review_cost = st.number_input("Cost: manual review", min_value=0.0, value=0.2, step=0.1)
+        manual_review_cost = st.number_input("Cost: manual review", min_value=0.0, value=float(active_costs["manual_review"]), step=0.1)
     if st.button("Simulate thresholds"):
         try:
             probabilities = [float(value.strip()) for value in probabilities_text.split(",") if value.strip()]
