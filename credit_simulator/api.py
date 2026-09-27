@@ -187,6 +187,13 @@ class ReviewHistoryResponse(BaseModel):
     events: list[ReviewHistoryEvent]
 
 
+class DecisionCosts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    approve_default: FiniteFloat = Field(ge=0)
+    decline_good: FiniteFloat = Field(ge=0)
+    manual_review: FiniteFloat = Field(ge=0)
+
+
 class ThresholdSimulationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     probabilities: list[float] = Field(min_length=1, max_length=100000)
@@ -201,7 +208,7 @@ class CurrentPolicy(BaseModel):
     policy_version: str
     decision_thresholds: dict[str, FiniteFloat]
     risk_bands: dict[str, FiniteFloat]
-    decision_costs: dict[str, FiniteFloat]
+    decision_costs: DecisionCosts
 
 
 class DriftRequest(BaseModel):

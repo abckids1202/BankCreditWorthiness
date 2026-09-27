@@ -80,6 +80,17 @@ def test_prediction_policy_values_are_constrained():
         api.Prediction(**{**common, "risk_band": "unknown"})
 
 
+def test_decision_cost_schema_is_complete_and_non_negative():
+    costs = api.DecisionCosts(approve_default=5, decline_good=1, manual_review=0.2)
+    assert costs.manual_review == 0.2
+    with pytest.raises(ValueError):
+        api.DecisionCosts(approve_default=5, decline_good=1)
+    with pytest.raises(ValueError):
+        api.DecisionCosts(approve_default=-1, decline_good=1, manual_review=0.2)
+    with pytest.raises(ValueError):
+        api.DecisionCosts(approve_default=5, decline_good=1, manual_review=0.2, other=1)
+
+
 def test_ready_endpoint():
     response = TestClient(app).get("/ready")
     assert response.status_code == 200
