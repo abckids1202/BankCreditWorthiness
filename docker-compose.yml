@@ -2,6 +2,9 @@ services:
   api:
     build: .
     command: uvicorn credit_simulator.api:app --host 0.0.0.0 --port 8000
+    environment:
+      CREDIT_API_KEY: "${CREDIT_API_KEY:-}"
+      CREDIT_RATE_LIMIT_PER_MINUTE: "${CREDIT_RATE_LIMIT_PER_MINUTE:-}"
     ports:
       - "8000:8000"
     volumes:
