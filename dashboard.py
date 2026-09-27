@@ -132,7 +132,7 @@ with tabs[2]:
             if image.exists():
                 st.image(str(image), caption="Calibration curve")
         with st.expander("Data quality and feature engineering"):
-            st.json({"data_quality": report.get("data_quality"), "feature_engineering": report.get("feature_engineering")})
+            st.json({"training_config": report.get("training_config"), "data_quality": report.get("data_quality"), "feature_engineering": report.get("feature_engineering")})
     else:
         st.info("Run python scripts/train.py to generate model evidence.")
 
