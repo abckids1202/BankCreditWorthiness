@@ -12,6 +12,8 @@ probability >= 0.45  -> decline
 
 Inputs flagged as extreme or invalid are routed to review. A human reviewer must not overwrite the original automatic recommendation; the review outcome is stored separately.
 
+The review queue accepts only predictions whose automatic recommendation is `manual_review`. Approved and declined outputs remain policy outcomes unless a separate, explicitly designed workflow is added; this prototype does not use the review queue to bypass the policy.
+
 `POST /policy/simulate` is for research only. It can compare thresholds and resulting population rates but cannot modify the live policy.
 
 Threshold changes should be evaluated for cost, approval rate, review workload, default rate among approvals, calibration, and group fairness before adoption.

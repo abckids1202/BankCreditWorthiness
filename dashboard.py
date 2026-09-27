@@ -67,7 +67,9 @@ with tabs[0]:
             st.write(f"• {reason}")
         with st.expander("Structured model explanations"):
             st.json(result.get("explanations", []))
-        if st.button("Create review case", disabled=not result):
+        if result and result.get("decision") != "manual_review":
+            st.caption("Only manual_review recommendations can enter the human-review queue.")
+        if st.button("Create review case", disabled=not result or result.get("decision") != "manual_review"):
             try:
                 case = api_request("POST", "/review-cases", json=st.session_state["applicant"])
                 st.success(f"Review case created: {case['case_id']}")

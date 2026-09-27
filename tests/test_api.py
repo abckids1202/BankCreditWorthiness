@@ -76,6 +76,14 @@ def test_out_of_distribution_input_is_reviewed():
     assert response.json()["decision"] == "manual_review"
 
 
+def test_review_queue_rejects_non_manual_recommendations(monkeypatch):
+    applicant = {"LIMIT_BAL": 50000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
+    prediction = api.Prediction(risk_probability=0.1, credit_score=750, risk_band="low", decision="approve", rationale="low risk", decision_thresholds={"approve_max_risk": 0.2, "decline_min_risk": 0.45}, model_version="test", policy_version="policy-test", reason_codes=[], explanations=[], warnings=[], educational_disclaimer="test")
+    monkeypatch.setattr(api, "predict", lambda applicant, request: prediction)
+    response = TestClient(app).post("/review-cases", json=applicant)
+    assert response.status_code == 422
+
+
 def test_out_of_range_repayment_status_is_rejected():
     applicant = {"LIMIT_BAL": 50000, "PAY_0": 9, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
     assert TestClient(app).post("/predict", json=applicant).status_code == 422
@@ -125,7 +133,7 @@ def test_monitoring_drift_endpoint():
 
 def test_review_history_endpoint(monkeypatch, tmp_path):
     monkeypatch.setattr(api, "review_store", ReviewStore(tmp_path / "reviews.db"))
-    applicant = {"LIMIT_BAL": 50000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
+    applicant = {"LIMIT_BAL": 1_000_000_000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
     client = TestClient(app)
     created = client.post("/review-cases", json=applicant)
     assert created.status_code == 200

@@ -268,7 +268,10 @@ def predict_alternate(dataset: str, request: DatasetPredictionRequest, http_requ
 
 @app.post("/review-cases")
 def create_review_case(applicant: Applicant, request: Request):
-    prediction = predict(applicant, request).model_dump()
+    prediction_result = predict(applicant, request)
+    if prediction_result.decision != "manual_review":
+        raise HTTPException(422, "Only manual_review recommendations can be sent to the human-review queue")
+    prediction = prediction_result.model_dump()
     return review_store.create(applicant.model_dump(), prediction)
 
 
