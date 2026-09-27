@@ -90,11 +90,18 @@ with tabs[1]:
     defaults_text = st.text_input("Optional actual defaults, comma-separated 0/1", "")
     approve = st.slider("Approve at or below", 0.0, 1.0, float(active_thresholds["approve_max_risk"]), 0.01)
     decline = st.slider("Decline at or above", 0.0, 1.0, float(active_thresholds["decline_min_risk"]), 0.01)
+    cost_columns = st.columns(3)
+    with cost_columns[0]:
+        approve_default_cost = st.number_input("Cost: approve a default", min_value=0.0, value=5.0, step=0.5)
+    with cost_columns[1]:
+        decline_good_cost = st.number_input("Cost: decline a non-default", min_value=0.0, value=1.0, step=0.5)
+    with cost_columns[2]:
+        manual_review_cost = st.number_input("Cost: manual review", min_value=0.0, value=0.2, step=0.1)
     if st.button("Simulate thresholds"):
         try:
             probabilities = [float(value.strip()) for value in probabilities_text.split(",") if value.strip()]
             actual = [int(value.strip()) for value in defaults_text.split(",") if value.strip()] if defaults_text.strip() else None
-            st.json(api_request("POST", "/policy/simulate", json={"probabilities": probabilities, "actual_defaults": actual, "approve_max_risk": approve, "decline_min_risk": decline}))
+            st.json(api_request("POST", "/policy/simulate", json={"probabilities": probabilities, "actual_defaults": actual, "approve_max_risk": approve, "decline_min_risk": decline, "costs": {"approve_default": approve_default_cost, "decline_good": decline_good_cost, "manual_review": manual_review_cost}}))
         except (ValueError, requests.RequestException) as exc:
             show_request_error(exc)
 with tabs[2]:

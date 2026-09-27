@@ -186,6 +186,15 @@ def test_policy_simulation_endpoint():
     assert response.json()["approval_rate"] == 1 / 3
 
 
+def test_policy_simulation_endpoint_returns_cost_and_error_metrics():
+    response = TestClient(app).post("/policy/simulate", json={"probabilities": [0.1, 0.3, 0.7], "approve_max_risk": 0.2, "decline_min_risk": 0.5, "actual_defaults": [0, 1, 1], "costs": {"approve_default": 8, "decline_good": 2, "manual_review": 0.25}})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["expected_cost"] == pytest.approx(0.25)
+    assert payload["false_negative_rate"] == pytest.approx(0.5)
+    assert payload["decision_costs"]["approve_default"] == 8
+
+
 def test_current_policy_endpoint_separates_policy_from_model():
     response = TestClient(app).get("/policy/current")
     assert response.status_code == 200

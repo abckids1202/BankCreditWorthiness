@@ -177,6 +177,7 @@ class ThresholdSimulationRequest(BaseModel):
     approve_max_risk: float = Field(ge=0, le=1)
     decline_min_risk: float = Field(ge=0, le=1)
     actual_defaults: list[int] | None = None
+    costs: dict[str, FiniteFloat] | None = None
 
 
 class CurrentPolicy(BaseModel):
@@ -278,7 +279,7 @@ def ready():
 @app.post("/policy/simulate")
 def policy_simulation(request: ThresholdSimulationRequest):
     try:
-        return simulate_thresholds(request.probabilities, request.approve_max_risk, request.decline_min_risk, request.actual_defaults)
+        return simulate_thresholds(request.probabilities, request.approve_max_risk, request.decline_min_risk, request.actual_defaults, request.costs)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
