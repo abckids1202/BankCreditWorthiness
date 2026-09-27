@@ -274,6 +274,14 @@ def get_review_case(case_id: str):
     return case
 
 
+@app.get("/review-cases/{case_id}/history")
+def get_review_case_history(case_id: str):
+    history = review_store.history(case_id)
+    if history is None:
+        raise HTTPException(404, "Review case not found")
+    return {"case_id": case_id, "events": history}
+
+
 class ReviewUpdate(BaseModel):
     reviewer_decision: Literal["approved", "declined", "needs_more_information", "escalated"] | None = None
     reviewer_note: str | None = Field(default=None, max_length=5000)

@@ -22,6 +22,10 @@ class ReviewStore:
             columns = {row[1] for row in connection.execute("PRAGMA table_info(review_cases)").fetchall()}
             if "policy_version" not in columns:
                 connection.execute("ALTER TABLE review_cases ADD COLUMN policy_version TEXT NOT NULL DEFAULT 'unknown'")
+            connection.execute("""CREATE TABLE IF NOT EXISTS review_events (
+                event_id TEXT PRIMARY KEY, case_id TEXT NOT NULL, event_type TEXT NOT NULL,
+                created_at TEXT NOT NULL, reviewer_decision TEXT, reviewer_note TEXT
+            )""")
 
     def _connect(self):
         connection = sqlite3.connect(self.path)
@@ -52,6 +56,10 @@ class ReviewStore:
                     json.dumps(prediction.get("warnings", [])), None, None, None,
                 ),
             )
+            connection.execute(
+                "INSERT INTO review_events (event_id, case_id, event_type, created_at, reviewer_decision, reviewer_note) VALUES (?, ?, ?, ?, ?, ?)",
+                (str(uuid.uuid4()), case_id, "created", now, None, None),
+            )
         return self.get(case_id)
 
     def get(self, case_id: str) -> dict | None:
@@ -64,11 +72,30 @@ class ReviewStore:
             rows = connection.execute("SELECT * FROM review_cases ORDER BY created_at DESC LIMIT ?", (min(max(limit, 1), 200),)).fetchall()
         return [self._serialize(row) for row in rows]
 
+    def history(self, case_id: str) -> list[dict] | None:
+        with self._connect() as connection:
+            exists = connection.execute("SELECT 1 FROM review_cases WHERE case_id = ?", (case_id,)).fetchone()
+            if not exists:
+                return None
+            rows = connection.execute(
+                "SELECT event_id, case_id, event_type, created_at, reviewer_decision, reviewer_note FROM review_events WHERE case_id = ? ORDER BY created_at ASC, event_id ASC",
+                (case_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def update(self, case_id: str, reviewer_decision: str | None, reviewer_note: str | None) -> dict | None:
         allowed = {"approved", "declined", "needs_more_information", "escalated"}
         if reviewer_decision is not None and reviewer_decision not in allowed:
             raise ValueError(f"reviewer_decision must be one of {sorted(allowed)}")
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as connection:
+            exists = connection.execute("SELECT 1 FROM review_cases WHERE case_id = ?", (case_id,)).fetchone()
+            if not exists:
+                return None
             connection.execute("UPDATE review_cases SET reviewer_decision = COALESCE(?, reviewer_decision), reviewer_note = COALESCE(?, reviewer_note), reviewed_at = ?, updated_at = ? WHERE case_id = ?", (reviewer_decision, reviewer_note, now if reviewer_decision else None, now, case_id))
+            if reviewer_decision is not None or reviewer_note is not None:
+                connection.execute(
+                    "INSERT INTO review_events (event_id, case_id, event_type, created_at, reviewer_decision, reviewer_note) VALUES (?, ?, ?, ?, ?, ?)",
+                    (str(uuid.uuid4()), case_id, "updated", now, reviewer_decision, reviewer_note),
+                )
         return self.get(case_id)

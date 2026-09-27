@@ -156,6 +156,9 @@ with tabs[3]:
             selected_id = st.selectbox("Case", case_ids)
             selected = api_request("GET", f"/review-cases/{selected_id}")
             st.json(selected)
+            history = api_request("GET", f"/review-cases/{selected_id}/history")
+            with st.expander("Review audit history"):
+                st.dataframe(history["events"], use_container_width=True)
             with st.form("review_update"):
                 decision = st.selectbox("Reviewer decision", ["approved", "declined", "needs_more_information", "escalated"])
                 note = st.text_area("Reviewer note")

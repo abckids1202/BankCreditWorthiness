@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 import credit_simulator.api as api
 from credit_simulator.api import app
 import shutil
+from credit_simulator.review import ReviewStore
 
 
 def test_health_endpoint():
@@ -109,4 +110,19 @@ def test_monitoring_drift_endpoint():
     response = TestClient(app).post("/monitoring/drift", json={"reference_records": [{"x": 1}, {"x": 2}], "current_records": [{"x": 100}, {"x": 100}], "features": ["x"]})
     assert response.status_code == 200
     assert response.json()["metrics"]["x"]["psi"] > 0
+
+
+def test_review_history_endpoint(monkeypatch, tmp_path):
+    monkeypatch.setattr(api, "review_store", ReviewStore(tmp_path / "reviews.db"))
+    applicant = {"LIMIT_BAL": 50000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}
+    client = TestClient(app)
+    created = client.post("/review-cases", json=applicant)
+    assert created.status_code == 200
+    case_id = created.json()["case_id"]
+    history = client.get(f"/review-cases/{case_id}/history")
+    assert history.status_code == 200
+    assert history.json()["events"][0]["event_type"] == "created"
+    updated = client.patch(f"/review-cases/{case_id}", json={"reviewer_decision": "approved", "reviewer_note": "Educational test"})
+    assert updated.status_code == 200
+    assert len(client.get(f"/review-cases/{case_id}/history").json()["events"]) == 2
 

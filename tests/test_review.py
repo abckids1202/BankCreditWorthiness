@@ -8,9 +8,20 @@ def test_review_case_preserves_model_decision(tmp_path):
     case = store.create({"LIMIT_BAL": 1000}, {"model_version": "test", "policy_version": "policy-0.1.0", "risk_probability": 0.3, "credit_score": 600, "decision": "manual_review", "reason_codes": ["test"], "warnings": []})
     assert case["automatic_decision"] == "manual_review"
     assert case["policy_version"] == "policy-0.1.0"
+    assert store.history(case["case_id"])[0]["event_type"] == "created"
     updated = store.update(case["case_id"], "approved", "Reviewed for prototype")
     assert updated["automatic_decision"] == "manual_review"
     assert updated["reviewer_decision"] == "approved"
+    events = store.history(case["case_id"])
+    assert len(events) == 2
+    assert events[1]["reviewer_decision"] == "approved"
+    assert events[1]["reviewer_note"] == "Reviewed for prototype"
+
+
+def test_review_history_missing_case_returns_none(tmp_path):
+    store = ReviewStore(tmp_path / "reviews.db")
+    assert store.history("missing") is None
+    assert store.update("missing", "approved", "note") is None
 
 
 def test_review_store_migrates_existing_schema(tmp_path):
