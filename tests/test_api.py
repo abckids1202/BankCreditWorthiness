@@ -51,6 +51,15 @@ def test_prediction_warning_defaults_are_independent_and_metadata_defaults_are_c
     assert second.fairness_warnings == []
 
 
+def test_request_schemas_reject_unknown_fields():
+    with pytest.raises(ValueError):
+        api.BatchPredictionRequest.model_validate({"applicants": [], "unexpected": True})
+    with pytest.raises(ValueError):
+        api.ThresholdSimulationRequest.model_validate({"probabilities": [0.1], "approve_max_risk": 0.2, "decline_min_risk": 0.45, "unexpected": True})
+    with pytest.raises(ValueError):
+        api.ReviewUpdate.model_validate({"reviewer_note": "test", "unexpected": True})
+
+
 def test_ready_endpoint():
     response = TestClient(app).get("/ready")
     assert response.status_code == 200

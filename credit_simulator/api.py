@@ -108,6 +108,7 @@ class Prediction(BaseModel):
 
 
 class BatchPredictionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     applicants: list[Applicant] = Field(min_length=1, max_length=1000)
 
 
@@ -177,6 +178,7 @@ class ReviewHistoryResponse(BaseModel):
 
 
 class ThresholdSimulationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     probabilities: list[float] = Field(min_length=1, max_length=100000)
     approve_max_risk: float = Field(ge=0, le=1)
     decline_min_risk: float = Field(ge=0, le=1)
@@ -192,6 +194,7 @@ class CurrentPolicy(BaseModel):
 
 
 class DriftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     reference_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
     current_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
     features: list[str] | None = None
@@ -202,6 +205,7 @@ class DriftRequest(BaseModel):
 
 
 class PredictionDriftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     reference_probabilities: list[FiniteFloat] = Field(min_length=1, max_length=100000)
     current_probabilities: list[FiniteFloat] = Field(min_length=1, max_length=100000)
     reference_decisions: list[str] | None = None
@@ -215,6 +219,7 @@ class PredictionDriftRequest(BaseModel):
 
 
 class FairnessDriftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     reference_metrics: dict[str, Any]
     current_metrics: dict[str, Any]
     delta_warning: float = Field(default=0.05, ge=0, le=1)
@@ -502,6 +507,7 @@ def get_review_case_history(case_id: str):
 
 
 class ReviewUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     reviewer_decision: ReviewerDecision | None = None
     reviewer_note: str | None = Field(default=None, max_length=5000)
     reviewer_id: str | None = Field(default=None, min_length=1, max_length=100)
