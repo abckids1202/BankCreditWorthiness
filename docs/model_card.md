@@ -26,7 +26,7 @@ Historical correlation is not causal evidence. Features may encode proxies for p
 
 ## Explainability
 
-The API returns directional feature reason codes and structured contributions. These are technical model explanations, not formal adverse-action notices or legal conclusions.
+The API returns directional feature reason codes and structured contributions. Linear candidates use signed coefficient contributions; nonlinear tree candidates use deterministic local feature-ablation effects against the fitted imputer baseline. These are technical model explanations, not causal claims, formal adverse-action notices, or legal conclusions.
 
 ## Monitoring and retraining
 
