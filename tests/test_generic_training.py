@@ -22,6 +22,11 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     assert metadata["runtime"]["scikit_learn"]
     assert metadata["schema_version"] == "1.0"
     assert metadata["experiment_id"].startswith("exp-")
+    assert len(metadata["threshold_analysis"]) == 19
+    assert metadata["calibration"]["brier_score"] >= 0
+    assert (tmp_path / "artifact" / "threshold_analysis.csv").exists()
+    assert (tmp_path / "artifact" / "calibration.json").exists()
+    assert (tmp_path / "artifact" / "fairness.json").exists()
 
 
 def test_generic_trainer_version_is_reproducible(tmp_path):
