@@ -5,9 +5,9 @@ from credit_simulator.predictions import PredictionEventStore
 
 def test_prediction_store_records_policy_version_and_summary(tmp_path):
     store = PredictionEventStore(tmp_path / "predictions.db")
-    store.record("uci_default", "model-1", 0.2, 700, "low", "approve", "request-1", "policy-2")
+    store.record("uci_default", "model-1", 0.2, 700, "low", "approve", "request-1", "policy-2", "dataset-1")
     summary = store.summary()
-    assert summary["groups"] == [{"dataset": "uci_default", "model_version": "model-1", "policy_version": "policy-2", "decision": "approve", "count": 1}]
+    assert summary["groups"] == [{"dataset": "uci_default", "model_version": "model-1", "policy_version": "policy-2", "dataset_version": "dataset-1", "decision": "approve", "count": 1}]
 
 
 def test_prediction_store_migrates_legacy_database(tmp_path):
@@ -22,3 +22,4 @@ def test_prediction_store_migrates_legacy_database(tmp_path):
     store = PredictionEventStore(database)
     store.record("legacy", "model-legacy", 0.5, 600, "moderate", "manual_review")
     assert store.summary()["groups"][0]["policy_version"] == "unknown"
+    assert store.summary()["groups"][0]["dataset_version"] == "unknown"
