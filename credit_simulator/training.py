@@ -121,7 +121,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     X_train, X_temp, y_train, y_temp, frame_train, frame_temp = train_test_split(X, y, frame, test_size=config["test_size"] + config["validation_size"], stratify=y, random_state=config["random_state"])
     relative_test = config["test_size"] / (config["test_size"] + config["validation_size"])
     X_valid, X_test, y_valid, y_test, frame_valid, frame_test = train_test_split(X_temp, y_temp, frame_temp, test_size=relative_test, stratify=y_temp, random_state=config["random_state"])
-    metrics = {}
+    metrics = {"majority_baseline": _metrics(y_valid, np.full(len(y_valid), float(y_train.mean())))}
     candidates = {}
     for name in ("logistic_regression", "gradient_boosting"):
         model = _pipeline(name, config["random_state"])
@@ -129,7 +129,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
         probabilities = model.predict_proba(X_valid)[:, 1]
         metrics[name] = _metrics(y_valid, probabilities)
         candidates[name] = model
-    selected_name = max(metrics, key=lambda name: (metrics[name]["pr_auc"], -metrics[name]["brier_score"]))
+    selected_name = max(candidates, key=lambda name: (metrics[name]["pr_auc"], -metrics[name]["brier_score"]))
     selected = candidates[selected_name]
     test_probabilities = selected.predict_proba(X_test)[:, 1]
     test_metrics = _metrics(y_test, test_probabilities)
