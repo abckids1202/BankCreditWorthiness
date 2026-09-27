@@ -22,3 +22,12 @@ def test_risk_bands():
     assert risk_band(0.15) == "moderate"
     assert risk_band(0.30) == "high"
     assert risk_band(0.60) == "very_high"
+
+
+def test_scoring_rejects_non_finite_or_invalid_configuration():
+    with pytest.raises(ValueError):
+        risk_band(float("nan"))
+    with pytest.raises(ValueError):
+        risk_band(0.2, {"low": 0.4, "moderate": 0.3, "high": 0.5})
+    with pytest.raises(ValueError):
+        probability_to_score(0.2, {"base_odds": 0})
