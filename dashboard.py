@@ -58,7 +58,7 @@ with tabs[0]:
         score_col.metric("Credit score", result["credit_score"])
         risk_col.metric("Default risk", f"{result.get('default_probability', result['risk_probability']):.1%}")
         decision_col.metric("Recommendation", result["decision"].replace("_", " ").title())
-        st.caption(f"Risk band: {result['risk_band']} | Model: {result['model_version']} | Policy: {result.get('policy_version', 'unknown')}")
+        st.caption(f"Risk band: {result['risk_band']} | Model: {result['model_version']} | Policy: {result.get('policy_version', 'unknown')} | Experiment: {result.get('experiment_id', 'unknown')} | Dataset: {result.get('dataset_version', 'unknown')}")
         st.info(result["rationale"])
         for warning in result.get("warnings", []):
             st.warning(warning)
@@ -82,6 +82,7 @@ with tabs[1]:
     if explanation_result:
         st.caption("These are technical model explanations, not causal explanations or legal adverse-action notices.")
         st.metric("Modeled default risk", f"{explanation_result.get('default_probability', explanation_result['risk_probability']):.1%}")
+        st.caption(f"Explanation source: model {explanation_result.get('model_version', 'unknown')} | experiment {explanation_result.get('experiment_id', 'unknown')} | dataset {explanation_result.get('dataset_version', 'unknown')}")
         st.json(explanation_result.get("explanations", []))
         st.subheader("Reason codes")
         for reason in explanation_result.get("reason_codes", []):
