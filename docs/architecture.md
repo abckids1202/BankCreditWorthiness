@@ -18,4 +18,4 @@ The primary UCI credit-card model has a dedicated request schema. Alternate data
 
 Container liveness is exposed at `/health`; artifact readiness is exposed at `/ready`. Docker Compose uses `/ready` for its API healthcheck, preventing the dashboard from starting against missing, corrupt, or checksum-mismatched model artifacts.
 
-Training keeps the current serving artifact and a fingerprinted immutable snapshot. The registry points to snapshots and records both model and policy versions so historical experiments remain auditable; changing the serving artifact still requires an explicit human-controlled promotion process.
+Training keeps the current serving artifact and a fingerprinted immutable snapshot. Artifacts also record a configuration fingerprint and runtime manifest. The registry points to snapshots and records model, policy, and configuration versions so historical experiments remain auditable; changing the serving artifact still requires an explicit human-controlled promotion process.

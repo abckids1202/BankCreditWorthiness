@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import platform
+import sys
 import shutil
 import time
 from pathlib import Path
@@ -10,6 +12,7 @@ import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.impute import SimpleImputer
@@ -191,6 +194,8 @@ def _fairness(frame: pd.DataFrame, y_true: np.ndarray, probabilities: np.ndarray
 def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw", config_path: str | Path | None = None) -> dict:
     started = time.perf_counter()
     config = load_config(config_path)
+    config_sha256 = hashlib.sha256(json.dumps(config, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    runtime = {"python": sys.version.split()[0], "platform": platform.platform(), "numpy": np.__version__, "pandas": pd.__version__, "scikit_learn": sklearn.__version__, "joblib": joblib.__version__}
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     reports = Path("outputs")
@@ -233,7 +238,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     joblib.dump(selected, output / "model.joblib")
     model_sha256 = hashlib.sha256((output / "model.joblib").read_bytes()).hexdigest()
     feature_stats = {name: {"mean": float(X_train[name].mean()), "std": float(max(X_train[name].std(), 1e-9))} for name in features if pd.api.types.is_numeric_dtype(X_train[name])}
-    metadata = {"model_version": model_version, "policy_version": config["policy_version"], "artifact_fingerprint": artifact_fingerprint, "model_sha256": model_sha256, "selected_model": selected_name, "training_config": config, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "test_metric_bootstrap": bootstrap, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
+    metadata = {"model_version": model_version, "policy_version": config["policy_version"], "artifact_fingerprint": artifact_fingerprint, "training_config_sha256": config_sha256, "runtime": runtime, "model_sha256": model_sha256, "selected_model": selected_name, "training_config": config, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "test_metric_bootstrap": bootstrap, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     version_dir = output / "versions" / artifact_fingerprint
     version_dir.mkdir(parents=True, exist_ok=True)
@@ -244,7 +249,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
     fairness_detailed = group_metrics(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], config["thresholds"]["approve_max_risk"], config["thresholds"]["decline_min_risk"])
     fairness_sensitivity = threshold_sensitivity(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], [(0.10, 0.30), (0.20, 0.45), (0.30, 0.60)])
-    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "training_config": config, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed, "fairness_threshold_sensitivity": fairness_sensitivity}
+    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "training_config": config, "training_config_sha256": config_sha256, "runtime": runtime, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed, "fairness_threshold_sensitivity": fairness_sensitivity}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     register_model(metadata, version_dir)
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")

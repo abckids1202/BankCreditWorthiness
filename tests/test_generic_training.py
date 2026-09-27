@@ -15,6 +15,8 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     assert (tmp_path / "artifact" / "training_report.json").exists()
     assert metadata["dataset_summary"]["default_rate"] == 0.5
     assert metadata["metrics_test"]["roc_auc"] >= 0
+    assert len(metadata["training_config_sha256"]) == 64
+    assert metadata["runtime"]["scikit_learn"]
 
 
 def test_generic_trainer_version_is_reproducible(tmp_path):

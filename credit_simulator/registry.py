@@ -22,7 +22,7 @@ def register_model(metadata: dict, artifact_dir: str | Path, registry_path: str 
     artifact = str(Path(artifact_dir).as_posix())
     dataset = metadata.get("dataset", "unknown")
     dataset_name = dataset.get("name", "unknown") if isinstance(dataset, dict) else dataset
-    entry = {"dataset": dataset_name, "model_version": metadata.get("model_version", "unknown"), "policy_version": metadata.get("policy_version", "unknown"), "artifact_fingerprint": metadata.get("artifact_fingerprint"), "model_sha256": metadata.get("model_sha256"), "dataset_sha256": metadata.get("dataset_sha256", dataset.get("sha256") if isinstance(dataset, dict) else None), "artifact_dir": artifact, "selected_model": metadata.get("selected_model", "generic"), "metrics_test": metadata.get("metrics_test", {}), "registered_at": datetime.now(timezone.utc).isoformat(), "status": "available"}
+    entry = {"dataset": dataset_name, "model_version": metadata.get("model_version", "unknown"), "policy_version": metadata.get("policy_version", "unknown"), "training_config_sha256": metadata.get("training_config_sha256", "unknown"), "artifact_fingerprint": metadata.get("artifact_fingerprint"), "model_sha256": metadata.get("model_sha256"), "dataset_sha256": metadata.get("dataset_sha256", dataset.get("sha256") if isinstance(dataset, dict) else None), "artifact_dir": artifact, "selected_model": metadata.get("selected_model", "generic"), "metrics_test": metadata.get("metrics_test", {}), "registered_at": datetime.now(timezone.utc).isoformat(), "status": "available"}
     entries = [item for item in entries if not (item.get("artifact_dir") == artifact and item.get("model_version") == entry["model_version"])]
     entries.append(entry)
     registry_path.write_text(json.dumps(entries, indent=2, default=str), encoding="utf-8")
@@ -43,6 +43,7 @@ def list_models(registry_path: str | Path = "artifacts/model_registry.json") -> 
     for entry in entries:
         item = dict(entry)
         item.setdefault("policy_version", "unknown")
+        item.setdefault("training_config_sha256", "unknown")
         artifact_dir = Path(item.get("artifact_dir", ""))
         model_path, metadata_path = artifact_dir / "model.joblib", artifact_dir / "metadata.json"
         item["artifact_available"] = model_path.exists() and metadata_path.exists()
