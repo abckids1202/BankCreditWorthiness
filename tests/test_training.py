@@ -1,6 +1,6 @@
 import pytest
 
-from credit_simulator.training import _approval_rate_report, _bootstrap_intervals, _candidate_specs
+from credit_simulator.training import _approval_rate_report, _bootstrap_intervals, _candidate_specs, _data_quality
 
 
 def test_approval_rate_report_measures_defaults_not_approved():
@@ -37,3 +37,18 @@ def test_candidate_specs_cover_baseline_families_and_calibration_variants():
         "gradient_boosting_calibrated",
     }
     assert sum(bool(spec["calibrated"]) for spec in specs) == 2
+
+
+def test_data_quality_report_includes_ids_targets_outliers_and_categorical_summary():
+    frame = __import__("pandas").DataFrame({
+        "ID": [1, 1, 3, 4],
+        "LIMIT_BAL": [100, 100, 100, 10_000],
+        "SEX": [1, 1, 2, 2],
+        "default": [0, 1, 0, 0],
+    })
+    quality = _data_quality(frame, ["LIMIT_BAL"])
+    assert quality["duplicate_id_rows"] == 1
+    assert quality["target_values"] == [0, 1]
+    assert quality["target_outside_binary_count"] == 0
+    assert quality["numeric_outlier_counts_iqr"]["LIMIT_BAL"] == 1
+    assert quality["categorical_summary"]["SEX"]["unique_values"] == 2

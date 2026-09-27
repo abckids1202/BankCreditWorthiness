@@ -6,6 +6,7 @@ import platform
 import sys
 import shutil
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
@@ -117,7 +118,34 @@ def _global_feature_importance(model, X_test, y_test, features, descriptions, ra
 
 def _data_quality(frame, features):
     numeric = frame[features].select_dtypes(include=np.number)
-    return {"rows": int(len(frame)), "columns": int(len(frame.columns)), "duplicate_rows": int(frame.duplicated().sum()), "missing_by_column": {str(k): float(v) for k, v in frame.isna().mean().items()}, "constant_columns": [str(c) for c in frame.columns if frame[c].nunique(dropna=False) <= 1], "numeric_summary": json.loads(numeric.describe(percentiles=[0.01, 0.5, 0.99]).transpose().to_json())}
+    numeric_summary = json.loads(numeric.describe(percentiles=[0.01, 0.5, 0.99]).transpose().to_json())
+    outlier_counts = {}
+    for column in numeric.columns:
+        values = numeric[column].dropna()
+        if values.empty:
+            outlier_counts[column] = 0
+            continue
+        lower, upper = values.quantile(0.25), values.quantile(0.75)
+        spread = upper - lower
+        outlier_counts[column] = int(((values < lower - 1.5 * spread) | (values > upper + 1.5 * spread)).sum())
+    categorical_summary = {}
+    for column in frame.columns:
+        if column not in numeric.columns and column != TARGET:
+            counts = frame[column].astype("string").fillna("<missing>").value_counts(dropna=False)
+            categorical_summary[column] = {"unique_values": int(frame[column].nunique(dropna=True)), "missing_fraction": float(frame[column].isna().mean()), "rare_category_count": int((counts < max(5, len(frame) * 0.01)).sum()), "top_values": {str(key): int(value) for key, value in counts.head(10).items()}}
+    return {
+        "rows": int(len(frame)),
+        "columns": int(len(frame.columns)),
+        "duplicate_rows": int(frame.duplicated().sum()),
+        "duplicate_id_rows": int(frame["ID"].duplicated().sum()) if "ID" in frame else None,
+        "missing_by_column": {str(k): float(v) for k, v in frame.isna().mean().items()},
+        "constant_columns": [str(c) for c in frame.columns if frame[c].nunique(dropna=False) <= 1],
+        "target_values": sorted({int(value) for value in frame[TARGET].dropna().unique()}) if TARGET in frame else [],
+        "target_outside_binary_count": int((~frame[TARGET].isin([0, 1])).sum()) if TARGET in frame else None,
+        "numeric_summary": numeric_summary,
+        "numeric_outlier_counts_iqr": outlier_counts,
+        "categorical_summary": categorical_summary,
+    }
 
 
 def _plots(frame, y, probabilities, reports, threshold_rows=None, features=None, config=None):
@@ -252,13 +280,18 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     feature_descriptions = engineered_feature_descriptions()
     global_importance = _global_feature_importance(selected, X_test, y_test, features, feature_descriptions, config["random_state"])
     dataset_hash = hashlib.sha256(frame.to_csv(index=False).encode("utf-8")).hexdigest()
+    training_timestamp = datetime.now(timezone.utc).isoformat()
+    split_overlap = {"train_validation": 0, "train_test": 0, "validation_test": 0}
+    if "ID" in frame:
+        train_ids, valid_ids, test_ids = (set(part["ID"].dropna().tolist()) for part in (frame_train, frame_valid, frame_test))
+        split_overlap = {"train_validation": len(train_ids & valid_ids), "train_test": len(train_ids & test_ids), "validation_test": len(valid_ids & test_ids)}
     version_payload = json.dumps({"dataset_sha256": dataset_hash, "config": config, "selected_model": selected_name}, sort_keys=True, default=str).encode("utf-8")
     artifact_fingerprint = hashlib.sha256(version_payload).hexdigest()[:12]
     model_version = f"0.3.0+{artifact_fingerprint}"
     joblib.dump(selected, output / "model.joblib")
     model_sha256 = hashlib.sha256((output / "model.joblib").read_bytes()).hexdigest()
     feature_stats = {name: {"mean": float(X_train[name].mean()), "std": float(max(X_train[name].std(), 1e-9))} for name in features if pd.api.types.is_numeric_dtype(X_train[name])}
-    metadata = {"model_version": model_version, "policy_version": config["policy_version"], "artifact_fingerprint": artifact_fingerprint, "training_config_sha256": config_sha256, "runtime": runtime, "model_sha256": model_sha256, "selected_model": selected_name, "training_config": config, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "test_metric_bootstrap": bootstrap, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
+    metadata = {"model_version": model_version, "policy_version": config["policy_version"], "artifact_fingerprint": artifact_fingerprint, "training_config_sha256": config_sha256, "runtime": runtime, "model_sha256": model_sha256, "selected_model": selected_name, "training_config": config, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "test_metric_bootstrap": bootstrap, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "license": "UCI Machine Learning Repository dataset terms; cite Yeh and Lien (2009)", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_timestamp": training_timestamp, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     version_dir = output / "versions" / artifact_fingerprint
     version_dir.mkdir(parents=True, exist_ok=True)
@@ -269,7 +302,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
     fairness_detailed = group_metrics(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], config["thresholds"]["approve_max_risk"], config["thresholds"]["decline_min_risk"])
     fairness_sensitivity = threshold_sensitivity(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], [(0.10, 0.30), (0.20, 0.45), (0.30, 0.60)])
-    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "training_config": config, "training_config_sha256": config_sha256, "runtime": runtime, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed, "fairness_threshold_sensitivity": fairness_sensitivity}
+    report = {"dataset_summary": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "license": "UCI Machine Learning Repository dataset terms; cite Yeh and Lien (2009)", "rows": int(len(frame)), "feature_count": int(len(features)), "target_name": TARGET, "positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "training_timestamp": training_timestamp, "dataset_sha256": dataset_hash, "split_overlap": split_overlap, "class_imbalance_ratio": float((y == 0).sum() / max((y == 1).sum(), 1))}, "training_config": config, "training_config_sha256": config_sha256, "runtime": runtime, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed, "fairness_threshold_sensitivity": fairness_sensitivity}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     register_model(metadata, version_dir)
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
