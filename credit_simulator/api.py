@@ -20,6 +20,7 @@ from .scoring import probability_to_score, risk_band
 from .review import ReviewStore
 from .datasets import ADAPTERS
 from .monitoring import drift_report
+from .registry import list_models
 
 
 ARTIFACT_DIR = Path("artifacts")
@@ -136,6 +137,11 @@ def monitoring_drift(request: DriftRequest):
 def model_info():
     _, metadata = _artifacts()
     return metadata
+
+
+@app.get("/models")
+def models():
+    return {"models": list_models()}
 
 
 @app.post("/predict", response_model=Prediction)
