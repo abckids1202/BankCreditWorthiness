@@ -10,7 +10,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from .explain import reason_codes
+from .features import engineer_features
 from .policy import decide
+from .scoring import probability_to_score, risk_band
 
 
 ARTIFACT_DIR = Path("artifacts")
@@ -27,10 +29,14 @@ class Applicant(BaseModel):
 
 class Prediction(BaseModel):
     risk_probability: float
+    credit_score: int
+    risk_band: str
     decision: str
     rationale: str
+    decision_thresholds: dict[str, float]
     model_version: str
     reason_codes: list[str]
+    warnings: list[str]
     educational_disclaimer: str
 
 
@@ -56,13 +62,16 @@ def model_info():
 def predict(applicant: Applicant):
     model, metadata = _artifacts()
     payload = applicant.model_dump()
+    raw_features = metadata.get("raw_feature_names", metadata["feature_names"])
+    raw_frame = pd.DataFrame([{name: payload[name] for name in raw_features}])
+    frame = engineer_features(raw_frame)
     features = metadata["feature_names"]
-    frame = pd.DataFrame([{name: payload[name] for name in features}])
     try:
-        probability = float(model.predict_proba(frame)[:, 1][0])
+        probability = float(np.clip(model.predict_proba(frame[features])[:, 1][0], 1e-6, 1 - 1e-6))
         outlier = bool((frame.abs() > 1e9).any(axis=None))
         decision = decide(probability, out_of_distribution=outlier, **{key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")})
     except (KeyError, ValueError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    return Prediction(risk_probability=probability, decision=decision.decision, rationale=decision.rationale, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), educational_disclaimer=metadata["disclaimer"])
+    warnings = ["Input contains an extreme value and was routed to review"] if outlier else []
+    return Prediction(risk_probability=probability, credit_score=probability_to_score(probability, metadata["score"]), risk_band=risk_band(probability, metadata["risk_bands"]), decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), warnings=warnings, educational_disclaimer=metadata["disclaimer"])
 

@@ -6,4 +6,18 @@ thresholds:
   decline_min_risk: 0.45
   max_missing_fraction: 0.10
   out_of_distribution_z: 5.0
+score:
+  min_score: 300
+  max_score: 850
+  base_score: 600
+  base_odds: 19.0
+  points_to_double_odds: 20.0
+risk_bands:
+  low: 0.10
+  moderate: 0.25
+  high: 0.45
+costs:
+  approve_default: 5.0
+  decline_good: 1.0
+  manual_review: 0.2
 

@@ -7,5 +7,6 @@ data/raw/
 artifacts/
 outputs/*.json
 outputs/*.png
+outputs/reports/
 .env
 

@@ -24,9 +24,14 @@ if submitted:
         response = requests.post(f"{api_url}/predict", json=values, timeout=30)
         response.raise_for_status()
         result = response.json()
-        st.metric("Modeled default risk", f"{result['risk_probability']:.1%}")
+        score_col, risk_col = st.columns(2)
+        score_col.metric("Credit score", result["credit_score"])
+        risk_col.metric("Modeled default risk", f"{result['risk_probability']:.1%}")
+        st.caption(f"Risk band: {result['risk_band']} | Model version: {result['model_version']}")
         st.subheader(result["decision"].replace("_", " ").title())
         st.info(result["rationale"])
+        for warning in result.get("warnings", []):
+            st.warning(warning)
         st.subheader("Reason codes")
         for reason in result["reason_codes"]:
             st.write(f"• {reason}")
