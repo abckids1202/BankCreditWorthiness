@@ -17,6 +17,9 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     assert metadata["metrics_test"]["roc_auc"] >= 0
     assert metadata["metrics_validation"]["brier_score"] >= 0
     assert metadata["feature_summary"]["income"]["type"] == "numeric"
+    assert metadata["feature_summary"]["purpose"]["rare_category_count"] == 0
+    assert metadata["dataset_summary"]["target_definition"] == "default"
+    assert "license" in metadata["dataset_summary"]
     assert metadata["training_timestamp"]
     assert len(metadata["training_config_sha256"]) == 64
     assert metadata["runtime"]["scikit_learn"]
