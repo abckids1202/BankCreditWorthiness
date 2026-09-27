@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
 import time
@@ -136,8 +137,9 @@ def _artifacts():
     try:
         model = joblib.load(model_path)
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        required = {"model_version", "feature_names", "thresholds", "score", "risk_bands"}
-        if not isinstance(metadata, dict) or not required.issubset(metadata) or not hasattr(model, "predict_proba"):
+        required = {"model_version", "feature_names", "thresholds", "score", "risk_bands", "model_sha256"}
+        checksum = hashlib.sha256(model_path.read_bytes()).hexdigest()
+        if not isinstance(metadata, dict) or not required.issubset(metadata) or metadata["model_sha256"] != checksum or not hasattr(model, "predict_proba"):
             raise ValueError("missing required model metadata or prediction interface")
         return model, metadata
     except Exception as exc:
