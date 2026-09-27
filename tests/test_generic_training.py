@@ -59,3 +59,5 @@ def test_generic_trainer_uses_temporal_split_when_adapter_declares_time_column(t
     assert metadata["dataset_summary"]["validation_rows"] == 4
     assert metadata["dataset_summary"]["test_rows"] == 4
     assert metadata["metrics_validation"]["roc_auc"] >= 0
+    assert metadata["split_comparison"]["serving_split"] == "temporal"
+    assert metadata["split_comparison"]["random_split"]["roc_auc"] >= 0
