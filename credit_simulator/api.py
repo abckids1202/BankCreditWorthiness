@@ -61,11 +61,13 @@ async def request_context(request, call_next):
                 response = JSONResponse(status_code=500, content={"detail": "CREDIT_RATE_LIMIT_PER_MINUTE must be a positive integer"})
             else:
                 key = request.headers.get("X-API-Key") or (request.client.host if request.client else "unknown")
-                allowed, retry_after = rate_limiter.check(key, rate_limit)
+                allowed, retry_after, remaining = rate_limiter.check_with_remaining(key, rate_limit)
                 if not allowed:
-                    response = JSONResponse(status_code=429, content={"detail": "Rate limit exceeded; retry later"}, headers={"Retry-After": str(retry_after), "X-RateLimit-Limit": str(rate_limit)})
+                    response = JSONResponse(status_code=429, content={"detail": "Rate limit exceeded; retry later"}, headers={"Retry-After": str(retry_after), "X-RateLimit-Limit": str(rate_limit), "X-RateLimit-Remaining": "0"})
                 else:
                     response = await call_next(request)
+                    response.headers["X-RateLimit-Limit"] = str(rate_limit)
+                    response.headers["X-RateLimit-Remaining"] = str(remaining)
         else:
             response = await call_next(request)
     response.headers["X-Request-ID"] = request_id

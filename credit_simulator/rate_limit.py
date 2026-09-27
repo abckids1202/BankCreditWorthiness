@@ -13,18 +13,22 @@ class RateLimiter:
         self._events: dict[str, deque[float]] = defaultdict(deque)
         self._lock = Lock()
 
-    def check(self, key: str, limit: int, now: float | None = None) -> tuple[bool, int]:
+    def check_with_remaining(self, key: str, limit: int, now: float | None = None) -> tuple[bool, int, int]:
         if limit <= 0:
-            return True, 0
+            return True, 0, 0
         current = time.monotonic() if now is None else now
         with self._lock:
             events = self._events[key]
             while events and current - events[0] >= self.window_seconds:
                 events.popleft()
             if len(events) >= limit:
-                return False, max(1, int(self.window_seconds - (current - events[0]) + 0.999))
+                return False, max(1, int(self.window_seconds - (current - events[0]) + 0.999)), 0
             events.append(current)
-            return True, 0
+            return True, 0, max(limit - len(events), 0)
+
+    def check(self, key: str, limit: int, now: float | None = None) -> tuple[bool, int]:
+        allowed, retry_after, _ = self.check_with_remaining(key, limit, now)
+        return allowed, retry_after
 
     def clear(self) -> None:
         with self._lock:

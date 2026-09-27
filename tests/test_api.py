@@ -115,10 +115,14 @@ def test_optional_rate_limit(monkeypatch):
     from credit_simulator.api import rate_limiter
     rate_limiter.clear()
     client = TestClient(app)
-    assert client.get("/model-info").status_code == 200
+    first = client.get("/model-info")
+    assert first.status_code == 200
+    assert first.headers["X-RateLimit-Limit"] == "1"
+    assert first.headers["X-RateLimit-Remaining"] == "0"
     limited = client.get("/model-info")
     assert limited.status_code == 429
     assert limited.headers.get("Retry-After")
+    assert limited.headers["X-RateLimit-Remaining"] == "0"
     rate_limiter.clear()
 
 
