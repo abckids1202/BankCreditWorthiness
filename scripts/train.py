@@ -18,10 +18,10 @@ if __name__ == "__main__":
     if args.dataset == "uci_default":
         output_dir = args.output_dir or "artifacts"
         metadata = train(raw_dir=args.raw_dir, output_dir=output_dir, config_path=args.config)
-        print(json.dumps({"status": "trained", "dataset": args.dataset, "model_version": metadata["model_version"], "policy_version": metadata["policy_version"], "artifact_fingerprint": metadata["artifact_fingerprint"], "artifact_dir": output_dir, "metrics_test": metadata["metrics_test"]}, sort_keys=True, default=str))
+        print(json.dumps({"status": "trained", "dataset": args.dataset, "experiment_id": metadata.get("experiment_id", "unknown"), "model_version": metadata["model_version"], "policy_version": metadata["policy_version"], "artifact_fingerprint": metadata["artifact_fingerprint"], "artifact_dir": output_dir, "metrics_test": metadata["metrics_test"]}, sort_keys=True, default=str))
     else:
         bundle = get_dataset(args.dataset, args.raw_dir)
         output_dir = args.output_dir or f"artifacts/{args.dataset}"
         metadata = train_tabular(bundle, output_dir)
-        print(json.dumps({"status": "trained", "dataset": args.dataset, "model_version": metadata["model_version"], "policy_version": metadata["policy_version"], "artifact_fingerprint": metadata["artifact_fingerprint"], "artifact_dir": output_dir, "metrics_test": metadata["metrics_test"]}, sort_keys=True, default=str))
+        print(json.dumps({"status": "trained", "dataset": args.dataset, "experiment_id": metadata.get("experiment_id", "unknown"), "model_version": metadata["model_version"], "policy_version": metadata["policy_version"], "artifact_fingerprint": metadata["artifact_fingerprint"], "artifact_dir": output_dir, "metrics_test": metadata["metrics_test"]}, sort_keys=True, default=str))
 
