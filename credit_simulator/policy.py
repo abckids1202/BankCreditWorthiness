@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 
 @dataclass(frozen=True)
@@ -9,10 +10,16 @@ class Decision:
     rationale: str
 
 
+def validate_thresholds(approve_max_risk: float, decline_min_risk: float) -> None:
+    if not all(math.isfinite(value) for value in (approve_max_risk, decline_min_risk)) or not 0 <= approve_max_risk < decline_min_risk <= 1:
+        raise ValueError("thresholds must satisfy 0 <= approve < decline <= 1")
+
+
 def decide(risk_probability: float, *, approve_max_risk: float = 0.20, decline_min_risk: float = 0.45, out_of_distribution: bool = False) -> Decision:
+    validate_thresholds(approve_max_risk, decline_min_risk)
     if out_of_distribution:
         return Decision("manual_review", "Input is outside the training distribution")
-    if not 0 <= risk_probability <= 1:
+    if not math.isfinite(risk_probability) or not 0 <= risk_probability <= 1:
         raise ValueError("risk_probability must be between 0 and 1")
     if risk_probability <= approve_max_risk:
         return Decision("approve", "Predicted risk is below the approval threshold")
@@ -22,9 +29,8 @@ def decide(risk_probability: float, *, approve_max_risk: float = 0.20, decline_m
 
 
 def simulate_thresholds(probabilities: list[float], approve_max_risk: float, decline_min_risk: float, actual_defaults: list[int] | None = None) -> dict:
-    if not 0 <= approve_max_risk < decline_min_risk <= 1:
-        raise ValueError("thresholds must satisfy 0 <= approve < decline <= 1")
-    if not probabilities or any(not 0 <= value <= 1 for value in probabilities):
+    validate_thresholds(approve_max_risk, decline_min_risk)
+    if not probabilities or any(not math.isfinite(value) or not 0 <= value <= 1 for value in probabilities):
         raise ValueError("probabilities must be non-empty and between 0 and 1")
     if actual_defaults is not None and (len(actual_defaults) != len(probabilities) or any(value not in (0, 1) for value in actual_defaults)):
         raise ValueError("actual_defaults must match probabilities and contain only 0/1")

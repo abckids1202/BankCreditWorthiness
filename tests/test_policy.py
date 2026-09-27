@@ -20,3 +20,13 @@ def test_threshold_simulation():
     assert result["decline_rate"] == pytest.approx(1 / 3)
     assert result["default_rate_approved"] == 0
 
+
+def test_invalid_policy_order_is_rejected():
+    with pytest.raises(ValueError):
+        decide(0.2, approve_max_risk=0.5, decline_min_risk=0.4)
+
+
+def test_non_finite_probability_is_rejected():
+    with pytest.raises(ValueError):
+        simulate_thresholds([float("nan")], 0.2, 0.5)
+
