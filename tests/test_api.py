@@ -285,6 +285,8 @@ def test_monitoring_fairness_endpoint():
     response = TestClient(app).post("/monitoring/fairness", json={"reference_metrics": {"group": {"A": {"approval_rate": 0.8}}}, "current_metrics": {"group": {"A": {"approval_rate": 0.6}}}})
     assert response.status_code == 200
     assert response.json()["metrics"]["group.A.approval_rate"]["level"] == "critical"
+    assert response.json()["fairness_governance"]["audit_only"] is True
+    assert response.json()["fairness_governance"]["uniform_default_policy"] is True
     history = TestClient(app).get("/monitoring/fairness/history")
     assert history.status_code == 200
     assert history.json()[0]["experiment_id"]

@@ -6,6 +6,14 @@ from sklearn.metrics import confusion_matrix, precision_score, recall_score
 from .scoring import probability_to_score
 
 
+FAIRNESS_GOVERNANCE = {
+    "audit_only": True,
+    "protected_attributes_used_for_scoring": False,
+    "uniform_default_policy": True,
+    "proxy_discrimination_warning": "Excluding protected attributes does not eliminate proxy discrimination; investigate disparities before any real-world use.",
+}
+
+
 def calibration_error(y_true, probabilities, bins: int = 10) -> float:
     """Compute expected calibration error for one audit group."""
     actual = np.asarray(y_true).astype(int)

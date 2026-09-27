@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from .explain import reason_codes, structured_reasons
-from .fairness import group_metrics
+from .fairness import FAIRNESS_GOVERNANCE, group_metrics
 from .features import engineer_features
 from .policy import decide, simulate_thresholds
 from .scoring import probability_to_score, risk_band
@@ -332,6 +332,7 @@ def policy_simulation(request: ThresholdSimulationRequest):
         if request.audit_groups:
             audit_frame = pd.DataFrame(request.audit_groups)
             result["fairness"] = group_metrics(audit_frame, np.asarray(request.actual_defaults), np.asarray(request.probabilities), list(request.audit_groups), request.approve_max_risk, request.decline_min_risk, classification_threshold=request.decline_min_risk)
+            result["fairness_governance"] = FAIRNESS_GOVERNANCE
         return result
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -387,6 +388,7 @@ def monitoring_fairness(request: FairnessDriftRequest, http_request: Request):
         except (OSError, json.JSONDecodeError):
             pass
         report.update({"model_version": model_version, "policy_version": policy_version, "experiment_id": experiment_id})
+        report["fairness_governance"] = FAIRNESS_GOVERNANCE
         drift_store.record_fairness(report, getattr(http_request.state, "request_id", None), model_version, policy_version, experiment_id)
         return report
     except ValueError as exc:
