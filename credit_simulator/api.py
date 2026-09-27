@@ -201,6 +201,8 @@ class PredictionDriftRequest(BaseModel):
     psi_critical: float = Field(default=0.25, ge=0, le=1)
     rate_warning: float = Field(default=0.05, ge=0, le=1)
     rate_critical: float = Field(default=0.15, ge=0, le=1)
+    reference_defaults: list[int] | None = None
+    current_defaults: list[int] | None = None
 
 
 class DriftHistoryEvent(BaseModel):
@@ -308,7 +310,7 @@ def monitoring_drift(request: DriftRequest, http_request: Request):
 @app.post("/monitoring/predictions")
 def monitoring_predictions(request: PredictionDriftRequest):
     try:
-        return prediction_drift_report(request.reference_probabilities, request.current_probabilities, request.reference_decisions, request.current_decisions, request.psi_warning, request.psi_critical, request.rate_warning, request.rate_critical)
+        return prediction_drift_report(request.reference_probabilities, request.current_probabilities, request.reference_decisions, request.current_decisions, request.psi_warning, request.psi_critical, request.rate_warning, request.rate_critical, request.reference_defaults, request.current_defaults)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 

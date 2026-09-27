@@ -59,3 +59,16 @@ def test_prediction_drift_rejects_mismatched_decision_lists_and_probabilities():
         prediction_drift_report([0.1, 0.2], [0.3], ["approve"], ["decline"])
     with pytest.raises(ValueError, match="between 0 and 1"):
         prediction_drift_report([1.1], [0.2])
+
+
+def test_prediction_drift_reports_labeled_default_and_calibration_drift():
+    report = prediction_drift_report(
+        [0.1, 0.2, 0.3, 0.4],
+        [0.6, 0.7, 0.8, 0.9],
+        reference_defaults=[0, 0, 0, 1],
+        current_defaults=[1, 1, 1, 1],
+    )
+    assert report["label_metrics"]["current_default_rate"] == 1.0
+    assert report["label_metrics"]["default_rate_delta"] > 0
+    assert "default_rate" in report["critical_metrics"]
+    assert "calibration_level" in report["label_metrics"]

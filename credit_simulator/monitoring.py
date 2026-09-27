@@ -75,6 +75,8 @@ def prediction_drift_report(
     psi_critical: float = 0.25,
     rate_warning: float = 0.05,
     rate_critical: float = 0.15,
+    reference_defaults: list[int] | None = None,
+    current_defaults: list[int] | None = None,
 ) -> dict:
     """Audit aggregate prediction and decision-rate drift without raw inputs."""
     if not reference_probabilities or not current_probabilities:
@@ -107,4 +109,38 @@ def prediction_drift_report(
         critical.insert(0, "default_probability")
     elif probability_level == "warning":
         warnings.insert(0, "default_probability")
-    return {"reference_rows": len(reference), "current_rows": len(current), "prediction_distribution": {"psi": probability_psi, "level": probability_level}, "decision_rates": decision_rates, "warning_metrics": warnings, "critical_metrics": critical, "thresholds": {"psi_warning": psi_warning, "psi_critical": psi_critical, "rate_warning": rate_warning, "rate_critical": rate_critical}, "recommended_action": "Investigate and pause automated use" if critical else "Investigate prediction shift before retraining" if warnings else "No material prediction drift detected", "automatic_retraining": False}
+    label_metrics = None
+    if reference_defaults is not None or current_defaults is not None:
+        if reference_defaults is None or current_defaults is None or len(reference_defaults) != len(reference) or len(current_defaults) != len(current):
+            raise ValueError("default-label lists must be supplied together and match their probability lists")
+        reference_labels = np.asarray(reference_defaults, dtype=int)
+        current_labels = np.asarray(current_defaults, dtype=int)
+        if not set(reference_labels).issubset({0, 1}) or not set(current_labels).issubset({0, 1}):
+            raise ValueError("default labels must contain only 0 or 1")
+
+        def _ece(scores: np.ndarray, labels: np.ndarray) -> float:
+            edges = np.linspace(0, 1, 11)
+            total = 0.0
+            for left, right in zip(edges[:-1], edges[1:]):
+                mask = (scores >= left) & ((scores < right) if right < 1 else (scores <= right))
+                if mask.any():
+                    total += float(mask.mean()) * abs(float(scores[mask].mean()) - float(labels[mask].mean()))
+            return float(total)
+
+        reference_rate = float(reference_labels.mean()); current_rate = float(current_labels.mean())
+        default_rate_delta = current_rate - reference_rate
+        calibration_reference = _ece(reference.to_numpy(), reference_labels)
+        calibration_current = _ece(current.to_numpy(), current_labels)
+        calibration_delta = calibration_current - calibration_reference
+        default_level = _missingness_level(default_rate_delta, rate_warning, rate_critical)
+        calibration_level = _missingness_level(calibration_delta, rate_warning, rate_critical)
+        label_metrics = {"reference_default_rate": reference_rate, "current_default_rate": current_rate, "default_rate_delta": default_rate_delta, "default_rate_level": default_level, "reference_brier_score": float(np.mean((reference.to_numpy() - reference_labels) ** 2)), "current_brier_score": float(np.mean((current.to_numpy() - current_labels) ** 2)), "reference_calibration_error": calibration_reference, "current_calibration_error": calibration_current, "calibration_error_delta": calibration_delta, "calibration_level": calibration_level}
+        if default_level == "critical":
+            critical.append("default_rate")
+        elif default_level == "warning":
+            warnings.append("default_rate")
+        if calibration_level == "critical":
+            critical.append("calibration")
+        elif calibration_level == "warning":
+            warnings.append("calibration")
+    return {"reference_rows": len(reference), "current_rows": len(current), "prediction_distribution": {"psi": probability_psi, "level": probability_level}, "decision_rates": decision_rates, "label_metrics": label_metrics, "warning_metrics": warnings, "critical_metrics": critical, "thresholds": {"psi_warning": psi_warning, "psi_critical": psi_critical, "rate_warning": rate_warning, "rate_critical": rate_critical}, "recommended_action": "Investigate and pause automated use" if critical else "Investigate prediction shift before retraining" if warnings else "No material prediction drift detected", "automatic_retraining": False}

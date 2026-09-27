@@ -212,13 +212,17 @@ with tabs[4]:
     current_probabilities_text = st.text_area("Current probabilities", "0.08, 0.12, 0.25, 0.40", key="current_prediction_probabilities")
     reference_decisions_text = st.text_input("Reference decisions, optional", "approve, approve, manual_review, decline", key="reference_prediction_decisions")
     current_decisions_text = st.text_input("Current decisions, optional", "approve, manual_review, manual_review, decline", key="current_prediction_decisions")
+    reference_defaults_text = st.text_input("Reference observed defaults, optional 0/1", "", key="reference_prediction_defaults")
+    current_defaults_text = st.text_input("Current observed defaults, optional 0/1", "", key="current_prediction_defaults")
     if st.button("Check prediction drift"):
         try:
             reference_probabilities = [float(value.strip()) for value in reference_probabilities_text.split(",") if value.strip()]
             current_probabilities = [float(value.strip()) for value in current_probabilities_text.split(",") if value.strip()]
             reference_decisions = [value.strip() for value in reference_decisions_text.split(",") if value.strip()] or None
             current_decisions = [value.strip() for value in current_decisions_text.split(",") if value.strip()] or None
-            result = api_request("POST", "/monitoring/predictions", json={"reference_probabilities": reference_probabilities, "current_probabilities": current_probabilities, "reference_decisions": reference_decisions, "current_decisions": current_decisions})
+            reference_defaults = [int(value.strip()) for value in reference_defaults_text.split(",") if value.strip()] or None
+            current_defaults = [int(value.strip()) for value in current_defaults_text.split(",") if value.strip()] or None
+            result = api_request("POST", "/monitoring/predictions", json={"reference_probabilities": reference_probabilities, "current_probabilities": current_probabilities, "reference_decisions": reference_decisions, "current_decisions": current_decisions, "reference_defaults": reference_defaults, "current_defaults": current_defaults})
             st.json(result)
             if result["critical_metrics"]:
                 st.error("Critical prediction drift detected. Investigate before automated use.")
