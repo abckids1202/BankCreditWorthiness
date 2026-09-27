@@ -308,5 +308,9 @@ with tabs[7]:
         if history:
             st.subheader("Recent drift diagnostics")
             st.dataframe(history, use_container_width=True)
+        fairness_history = api_request("GET", "/monitoring/fairness/history")
+        if fairness_history:
+            st.subheader("Recent fairness drift diagnostics")
+            st.dataframe(fairness_history, use_container_width=True)
     except requests.RequestException as exc:
         show_request_error(exc)

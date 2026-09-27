@@ -235,6 +235,23 @@ class DriftHistoryEvent(BaseModel):
     recommended_action: str
     model_version: str
     policy_version: str
+    experiment_id: str = "unknown"
+
+
+class FairnessDriftHistoryEvent(BaseModel):
+    event_id: int
+    created_at: str
+    request_id: str | None = None
+    metric_count: int
+    warning_metrics: list[str]
+    critical_metrics: list[str]
+    missing_from_current: list[str]
+    new_in_current: list[str]
+    thresholds: dict[str, float]
+    recommended_action: str
+    model_version: str
+    policy_version: str
+    experiment_id: str = "unknown"
 
 
 def _artifacts():
@@ -316,18 +333,19 @@ def current_policy():
 def monitoring_drift(request: DriftRequest, http_request: Request):
     try:
         report = drift_report(request.reference_records, request.current_records, request.features, request.psi_warning, request.psi_critical, request.missing_warning, request.missing_critical)
-        model_version = policy_version = "unknown"
+        model_version = policy_version = experiment_id = "unknown"
         metadata_path = ARTIFACT_DIR / "metadata.json"
         try:
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             if isinstance(metadata, dict):
                 model_version = metadata.get("model_version", "unknown")
                 policy_version = metadata.get("policy_version", "unknown")
+                experiment_id = metadata.get("experiment_id", "unknown")
         except (OSError, json.JSONDecodeError):
             pass
         report["model_version"] = model_version
         report["policy_version"] = policy_version
-        drift_store.record(report, getattr(http_request.state, "request_id", None), model_version, policy_version)
+        drift_store.record(report, getattr(http_request.state, "request_id", None), model_version, policy_version, experiment_id)
         return report
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -342,9 +360,21 @@ def monitoring_predictions(request: PredictionDriftRequest):
 
 
 @app.post("/monitoring/fairness")
-def monitoring_fairness(request: FairnessDriftRequest):
+def monitoring_fairness(request: FairnessDriftRequest, http_request: Request):
     try:
-        return fairness_drift_report(request.reference_metrics, request.current_metrics, request.delta_warning, request.delta_critical)
+        report = fairness_drift_report(request.reference_metrics, request.current_metrics, request.delta_warning, request.delta_critical)
+        model_version = policy_version = experiment_id = "unknown"
+        try:
+            metadata = json.loads((ARTIFACT_DIR / "metadata.json").read_text(encoding="utf-8"))
+            if isinstance(metadata, dict):
+                model_version = metadata.get("model_version", "unknown")
+                policy_version = metadata.get("policy_version", "unknown")
+                experiment_id = metadata.get("experiment_id", "unknown")
+        except (OSError, json.JSONDecodeError):
+            pass
+        report.update({"model_version": model_version, "policy_version": policy_version, "experiment_id": experiment_id})
+        drift_store.record_fairness(report, getattr(http_request.state, "request_id", None), model_version, policy_version, experiment_id)
+        return report
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
@@ -352,6 +382,11 @@ def monitoring_fairness(request: FairnessDriftRequest):
 @app.get("/monitoring/drift/history", response_model=list[DriftHistoryEvent])
 def monitoring_drift_history(limit: int = 50):
     return drift_store.list(limit)
+
+
+@app.get("/monitoring/fairness/history", response_model=list[FairnessDriftHistoryEvent])
+def monitoring_fairness_history(limit: int = 50):
+    return drift_store.list_fairness(limit)
 
 
 @app.get("/model-info")

@@ -243,6 +243,9 @@ def test_monitoring_fairness_endpoint():
     response = TestClient(app).post("/monitoring/fairness", json={"reference_metrics": {"group": {"A": {"approval_rate": 0.8}}}, "current_metrics": {"group": {"A": {"approval_rate": 0.6}}}})
     assert response.status_code == 200
     assert response.json()["metrics"]["group.A.approval_rate"]["level"] == "critical"
+    history = TestClient(app).get("/monitoring/fairness/history")
+    assert history.status_code == 200
+    assert history.json()[0]["experiment_id"]
 
 
 def test_monitoring_drift_history_endpoint(monkeypatch, tmp_path):
