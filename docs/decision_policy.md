@@ -16,4 +16,6 @@ The review queue accepts only predictions whose automatic recommendation is `man
 
 `POST /policy/simulate` is for research only. It can compare thresholds and resulting population rates but cannot modify the live policy.
 
+`GET /policy/current` exposes the active policy version, decision thresholds, and risk-band thresholds separately from model metadata. This makes policy changes auditable without implying that the model was retrained.
+
 Threshold changes should be evaluated for cost, approval rate, review workload, default rate among approvals, calibration, and group fairness before adoption.

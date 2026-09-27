@@ -137,6 +137,15 @@ def test_policy_simulation_endpoint():
     assert response.json()["approval_rate"] == 1 / 3
 
 
+def test_current_policy_endpoint_separates_policy_from_model():
+    response = TestClient(app).get("/policy/current")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["policy_version"] == "policy-0.1.0"
+    assert payload["decision_thresholds"]["approve_max_risk"] < payload["decision_thresholds"]["decline_min_risk"]
+    assert "low" in payload["risk_bands"]
+
+
 def test_monitoring_drift_endpoint():
     response = TestClient(app).post("/monitoring/drift", json={"reference_records": [{"x": 1}, {"x": 2}], "current_records": [{"x": 100}, {"x": 100}], "features": ["x"]})
     assert response.status_code == 200

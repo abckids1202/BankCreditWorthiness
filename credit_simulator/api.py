@@ -172,6 +172,12 @@ class ThresholdSimulationRequest(BaseModel):
     actual_defaults: list[int] | None = None
 
 
+class CurrentPolicy(BaseModel):
+    policy_version: str
+    decision_thresholds: dict[str, FiniteFloat]
+    risk_bands: dict[str, FiniteFloat]
+
+
 class DriftRequest(BaseModel):
     reference_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
     current_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
@@ -245,6 +251,12 @@ def policy_simulation(request: ThresholdSimulationRequest):
         return simulate_thresholds(request.probabilities, request.approve_max_risk, request.decline_min_risk, request.actual_defaults)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/policy/current", response_model=CurrentPolicy)
+def current_policy():
+    _, metadata = _artifacts()
+    return CurrentPolicy(policy_version=metadata.get("policy_version", "unknown"), decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, risk_bands=metadata["risk_bands"])
 
 
 @app.post("/monitoring/drift")
