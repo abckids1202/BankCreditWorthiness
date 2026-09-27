@@ -96,6 +96,7 @@ class Prediction(BaseModel):
     decision_thresholds: dict[str, float]
     model_version: str
     policy_version: str
+    dataset_version: str = "unknown"
     reason_codes: list[str]
     explanations: list[dict]
     warnings: list[str]
@@ -124,6 +125,7 @@ class DatasetPrediction(BaseModel):
     decision: str
     model_version: str
     policy_version: str
+    dataset_version: str = "unknown"
     warnings: list[str]
     educational_disclaimer: str
 
@@ -237,6 +239,13 @@ def _dataset_artifacts(dataset: str):
         raise HTTPException(503, f"Artifacts for {dataset} failed integrity validation; retrain the dataset model") from exc
 
 
+def _dataset_version(metadata: dict) -> str:
+    dataset = metadata.get("dataset")
+    if isinstance(dataset, dict):
+        return str(dataset.get("version") or dataset.get("sha256") or "unknown")
+    return str(metadata.get("dataset_sha256") or "unknown")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model_ready": (ARTIFACT_DIR / "model.joblib").exists()}
@@ -326,7 +335,7 @@ def predict(applicant: Applicant, request: Request):
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
     score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
     prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None), metadata.get("policy_version", "unknown"))
-    return Prediction(risk_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+    return Prediction(risk_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], dataset_version=_dataset_version(metadata), policy_version=metadata.get("policy_version", "unknown"), reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/predict/batch", response_model=BatchPredictionResponse)
@@ -350,7 +359,7 @@ def predict_alternate(dataset: str, request: DatasetPredictionRequest, http_requ
         raise HTTPException(422, str(exc)) from exc
     policy_version = metadata.get("policy_version", "alternate-experiment-0.1.0")
     prediction_store.record(dataset, metadata["model_version"], probability, probability_to_score(probability), risk_band(probability), decision.decision, getattr(http_request.state, "request_id", None), policy_version)
-    return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], policy_version=policy_version, warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
+    return DatasetPrediction(dataset=dataset, risk_probability=probability, credit_score=probability_to_score(probability), risk_band=risk_band(probability), decision=decision.decision, model_version=metadata["model_version"], dataset_version=_dataset_version(metadata), policy_version=policy_version, warnings=["Alternate dataset model; explanations and thresholds are dataset-specific research outputs"], educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/review-cases", response_model=ReviewCase)
