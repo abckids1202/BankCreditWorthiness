@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import shutil
 import time
 from pathlib import Path
 
@@ -234,6 +235,10 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     feature_stats = {name: {"mean": float(X_train[name].mean()), "std": float(max(X_train[name].std(), 1e-9))} for name in features if pd.api.types.is_numeric_dtype(X_train[name])}
     metadata = {"model_version": model_version, "artifact_fingerprint": artifact_fingerprint, "model_sha256": model_sha256, "selected_model": selected_name, "training_config": config, "feature_names": features, "raw_feature_names": model_features(load_uci_data(raw_dir, download=False)), "protected_attributes": PROTECTED, "metrics_validation": metrics, "metrics_test": test_metrics, "test_metric_bootstrap": bootstrap, "thresholds": config["thresholds"], "score": config["score"], "risk_bands": config["risk_bands"], "feature_stats": feature_stats, "training_rows": int(len(X_train)), "validation_rows": int(len(X_valid)), "test_rows": int(len(X_test)), "dataset": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "sha256": dataset_hash}, "feature_descriptions": feature_descriptions, "global_feature_importance": global_importance, "training_seconds": time.perf_counter() - started, "disclaimer": "Educational prototype; not for real lending decisions."}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    version_dir = output / "versions" / artifact_fingerprint
+    version_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(output / "model.joblib", version_dir / "model.joblib")
+    shutil.copy2(output / "metadata.json", version_dir / "metadata.json")
     fairness_frame = frame_test.copy()
     fairness_frame["AGE_BIN"] = pd.cut(fairness_frame["AGE"], bins=[0, 25, 35, 50, np.inf], labels=["<=25", "26-35", "36-50", "51+"])
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
@@ -241,7 +246,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     fairness_sensitivity = threshold_sensitivity(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], [(0.10, 0.30), (0.20, 0.45), (0.30, 0.60)])
     report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "training_config": config, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed, "fairness_threshold_sensitivity": fairness_sensitivity}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
-    register_model(metadata, output)
+    register_model(metadata, version_dir)
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     pd.DataFrame(threshold_rows).to_csv(report_dir / "threshold_analysis.csv", index=False)
     pd.DataFrame(approval_rate_rows).to_csv(report_dir / "approval_rate_analysis.csv", index=False)

@@ -9,6 +9,8 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     bundle = DatasetBundle("synthetic", frame, "default", [], ["income", "purpose"], {"source_url": "test"})
     metadata = train_tabular(bundle, tmp_path / "artifact")
     assert (tmp_path / "artifact" / "model.joblib").exists()
+    assert (tmp_path / "artifact" / "versions" / metadata["artifact_fingerprint"] / "model.joblib").exists()
+    assert (tmp_path / "artifact" / "versions" / metadata["artifact_fingerprint"] / "metadata.json").exists()
     assert metadata["metrics_test"]["roc_auc"] >= 0
 
 
