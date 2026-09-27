@@ -83,7 +83,7 @@ To explicitly promote a verified snapshot—or roll back by selecting an older v
 
 Prediction events are logged to a local generated SQLite database without storing raw applicant inputs. Use `GET /prediction-stats` for aggregate counts by dataset, model version, and automatic decision. This is intended for educational observability and should be replaced with a governed retention system before any real deployment.
 
-The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Model evidence includes the candidate metrics, fairness report, calibration data, global permutation feature importance, feature distributions, confusion matrix, risk distributions, and threshold comparison table/plot. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.
+The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Model evidence includes the candidate metrics, fairness report, calibration data, global permutation feature importance, feature distributions, confusion matrix, risk distributions, threshold comparison table/plot, and a read-only model registry view. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.
 
 ## API example
 

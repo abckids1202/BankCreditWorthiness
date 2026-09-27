@@ -87,7 +87,7 @@ with tabs[2]:
     report_path = Path("outputs/reports/training_report.json")
     if report_path.exists():
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        metric_tab, visual_tab, fairness_tab, calibration_tab = st.tabs(["Metrics", "Visual diagnostics", "Fairness", "Calibration"])
+        metric_tab, visual_tab, fairness_tab, calibration_tab, registry_tab = st.tabs(["Metrics", "Visual diagnostics", "Fairness", "Calibration", "Registry"])
         with metric_tab:
             st.json({"selected_model": report.get("selected_model"), "candidate_metrics": report.get("candidate_metrics"), "test_metrics": report.get("test_metrics")})
             if report.get("test_metric_bootstrap"):
@@ -131,6 +131,16 @@ with tabs[2]:
             image = Path("outputs/reports/calibration_curve.png")
             if image.exists():
                 st.image(str(image), caption="Calibration curve")
+        with registry_tab:
+            st.caption("Read-only model lifecycle view. Promotion and rollback remain explicit CLI operations.")
+            try:
+                registry = api_request("GET", "/models").get("models", [])
+                if registry:
+                    st.dataframe(pd.DataFrame(registry), use_container_width=True, hide_index=True)
+                else:
+                    st.info("No registered model versions found.")
+            except requests.RequestException as exc:
+                show_request_error(exc)
         with st.expander("Data quality and feature engineering"):
             st.json({"training_config": report.get("training_config"), "data_quality": report.get("data_quality"), "feature_engineering": report.get("feature_engineering")})
     else:
