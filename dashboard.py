@@ -79,10 +79,17 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("Research-only policy simulator")
     st.caption("This changes only the simulation output; it never changes the configured automatic policy.")
+    try:
+        active_policy = api_request("GET", "/policy/current")
+        active_thresholds = active_policy["decision_thresholds"]
+        st.caption(f"Active policy: {active_policy['policy_version']} | approve ≤ {active_thresholds['approve_max_risk']:.2f} | decline ≥ {active_thresholds['decline_min_risk']:.2f}")
+    except requests.RequestException:
+        active_thresholds = {"approve_max_risk": 0.20, "decline_min_risk": 0.45}
+        st.warning("Could not load the active policy; simulator defaults are shown.")
     probabilities_text = st.text_area("Predicted probabilities, comma-separated", "0.05, 0.12, 0.28, 0.51, 0.74")
     defaults_text = st.text_input("Optional actual defaults, comma-separated 0/1", "")
-    approve = st.slider("Approve at or below", 0.0, 0.9, 0.20, 0.01)
-    decline = st.slider("Decline at or above", 0.1, 1.0, 0.45, 0.01)
+    approve = st.slider("Approve at or below", 0.0, 1.0, float(active_thresholds["approve_max_risk"]), 0.01)
+    decline = st.slider("Decline at or above", 0.0, 1.0, float(active_thresholds["decline_min_risk"]), 0.01)
     if st.button("Simulate thresholds"):
         try:
             probabilities = [float(value.strip()) for value in probabilities_text.split(",") if value.strip()]
