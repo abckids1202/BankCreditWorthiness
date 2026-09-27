@@ -7,13 +7,19 @@ services:
     volumes:
       - ./artifacts:/app/artifacts
       - ./outputs:/app/outputs
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
   dashboard:
     build: .
     command: streamlit run dashboard.py --server.address 0.0.0.0 --server.port 8501
     ports:
       - "8501:8501"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     volumes:
       - ./artifacts:/app/artifacts
       - ./outputs:/app/outputs

@@ -61,6 +61,8 @@ The policy uses configurable thresholds: low risk is approved, high risk is decl
 
 The training report also includes detailed fairness comparisons by audit group: approval-rate differences and ratios, equal-opportunity differences, false-positive and false-negative-rate differences, calibration differences, average predicted risk, and average educational score. The default policy remains uniform across groups.
 
+Project governance and design documentation is available in `docs/`: `model_card.md`, `data_card.md`, `decision_policy.md`, `fairness_report.md`, and `architecture.md`. GitHub Actions runs the test suite on pushes and pull requests. Docker API containers expose a health check, and the dashboard waits for the API health check in Compose.
+
 ## API example
 
 After training, use the Swagger UI or send JSON to `POST /predict`. The request contains `LIMIT_BAL`, six repayment-status fields (`PAY_0`, `PAY_2`–`PAY_6`), six bill fields, and six payment fields. The response contains the modeled probability, credit score, risk band, decision thresholds, rationale, model version, structured explanations, reason codes, and warnings.
