@@ -192,6 +192,8 @@ def test_monitoring_drift_history_endpoint(monkeypatch, tmp_path):
     history = client.get("/monitoring/drift/history")
     assert history.status_code == 200
     assert history.json()[0]["current_rows"] == 1
+    assert history.json()[0]["model_version"]
+    assert history.json()[0]["policy_version"] == "policy-0.1.0"
 
 
 def test_review_history_endpoint(monkeypatch, tmp_path):

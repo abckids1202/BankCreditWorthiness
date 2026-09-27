@@ -199,6 +199,8 @@ class DriftHistoryEvent(BaseModel):
     critical_features: list[str]
     thresholds: dict[str, float]
     recommended_action: str
+    model_version: str
+    policy_version: str
 
 
 def _artifacts():
@@ -264,7 +266,18 @@ def current_policy():
 def monitoring_drift(request: DriftRequest, http_request: Request):
     try:
         report = drift_report(request.reference_records, request.current_records, request.features, request.psi_warning, request.psi_critical, request.missing_warning, request.missing_critical)
-        drift_store.record(report, getattr(http_request.state, "request_id", None))
+        model_version = policy_version = "unknown"
+        metadata_path = ARTIFACT_DIR / "metadata.json"
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if isinstance(metadata, dict):
+                model_version = metadata.get("model_version", "unknown")
+                policy_version = metadata.get("policy_version", "unknown")
+        except (OSError, json.JSONDecodeError):
+            pass
+        report["model_version"] = model_version
+        report["policy_version"] = policy_version
+        drift_store.record(report, getattr(http_request.state, "request_id", None), model_version, policy_version)
         return report
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc

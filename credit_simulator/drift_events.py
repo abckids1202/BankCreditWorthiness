@@ -18,20 +18,27 @@ class DriftEventStore:
                 request_id TEXT, reference_rows INTEGER NOT NULL, current_rows INTEGER NOT NULL,
                 features_checked_json TEXT NOT NULL, warning_features_json TEXT NOT NULL,
                 critical_features_json TEXT NOT NULL, thresholds_json TEXT NOT NULL,
-                recommended_action TEXT NOT NULL
+                recommended_action TEXT NOT NULL, model_version TEXT NOT NULL DEFAULT 'unknown',
+                policy_version TEXT NOT NULL DEFAULT 'unknown'
             )""")
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(drift_events)").fetchall()}
+            if "model_version" not in columns:
+                connection.execute("ALTER TABLE drift_events ADD COLUMN model_version TEXT NOT NULL DEFAULT 'unknown'")
+            if "policy_version" not in columns:
+                connection.execute("ALTER TABLE drift_events ADD COLUMN policy_version TEXT NOT NULL DEFAULT 'unknown'")
 
-    def record(self, report: dict, request_id: str | None = None) -> None:
+    def record(self, report: dict, request_id: str | None = None, model_version: str = "unknown", policy_version: str = "unknown") -> None:
         with sqlite3.connect(self.path) as connection:
             connection.execute(
                 """INSERT INTO drift_events (
                     created_at, request_id, reference_rows, current_rows, features_checked_json,
-                    warning_features_json, critical_features_json, thresholds_json, recommended_action
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    warning_features_json, critical_features_json, thresholds_json, recommended_action,
+                    model_version, policy_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     datetime.now(timezone.utc).isoformat(), request_id, report["reference_rows"], report["current_rows"],
                     json.dumps(report["features_checked"]), json.dumps(report["warning_features"]),
-                    json.dumps(report["critical_features"]), json.dumps(report["thresholds"]), report["recommended_action"],
+                    json.dumps(report["critical_features"]), json.dumps(report["thresholds"]), report["recommended_action"], model_version, policy_version,
                 ),
             )
 
@@ -40,11 +47,11 @@ class DriftEventStore:
             rows = connection.execute(
                 """SELECT event_id, created_at, request_id, reference_rows, current_rows,
                    features_checked_json, warning_features_json, critical_features_json,
-                   thresholds_json, recommended_action FROM drift_events
+                   thresholds_json, recommended_action, model_version, policy_version FROM drift_events
                    ORDER BY created_at DESC LIMIT ?""",
                 (min(max(limit, 1), 200),),
             ).fetchall()
-        columns = ("event_id", "created_at", "request_id", "reference_rows", "current_rows", "features_checked_json", "warning_features_json", "critical_features_json", "thresholds_json", "recommended_action")
+        columns = ("event_id", "created_at", "request_id", "reference_rows", "current_rows", "features_checked_json", "warning_features_json", "critical_features_json", "thresholds_json", "recommended_action", "model_version", "policy_version")
         result = []
         for row in rows:
             item = dict(zip(columns, row))
