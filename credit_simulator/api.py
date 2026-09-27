@@ -130,6 +130,10 @@ class DriftRequest(BaseModel):
     reference_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
     current_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
     features: list[str] | None = None
+    psi_warning: float = Field(default=0.10, ge=0, le=1)
+    psi_critical: float = Field(default=0.25, ge=0, le=1)
+    missing_warning: float = Field(default=0.05, ge=0, le=1)
+    missing_critical: float = Field(default=0.15, ge=0, le=1)
 
 
 def _artifacts():
@@ -187,7 +191,7 @@ def policy_simulation(request: ThresholdSimulationRequest):
 @app.post("/monitoring/drift")
 def monitoring_drift(request: DriftRequest):
     try:
-        return drift_report(request.reference_records, request.current_records, request.features)
+        return drift_report(request.reference_records, request.current_records, request.features, request.psi_warning, request.psi_critical, request.missing_warning, request.missing_critical)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
