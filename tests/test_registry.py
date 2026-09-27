@@ -62,3 +62,10 @@ def test_registry_exposes_policy_version(tmp_path):
     entry = register_model({"dataset": "test", "model_version": "v2", "policy_version": "policy-2", "metrics_test": {}}, tmp_path / "artifact", path)
     assert entry["policy_version"] == "policy-2"
     assert list_models(path)[0]["policy_version"] == "policy-2"
+
+
+def test_registry_normalizes_legacy_policy_version(tmp_path):
+    path = tmp_path / "registry.json"
+    path.write_text(json.dumps([{"dataset": "legacy", "model_version": "v1", "artifact_dir": str(tmp_path / "missing")}]), encoding="utf-8")
+    listed = list_models(path)
+    assert listed[0]["policy_version"] == "unknown"

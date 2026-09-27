@@ -42,6 +42,7 @@ def list_models(registry_path: str | Path = "artifacts/model_registry.json") -> 
     enriched = []
     for entry in entries:
         item = dict(entry)
+        item.setdefault("policy_version", "unknown")
         artifact_dir = Path(item.get("artifact_dir", ""))
         model_path, metadata_path = artifact_dir / "model.joblib", artifact_dir / "metadata.json"
         item["artifact_available"] = model_path.exists() and metadata_path.exists()
