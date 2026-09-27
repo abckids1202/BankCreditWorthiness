@@ -35,6 +35,15 @@ python scripts/profile_dataset.py --dataset give_me_some_credit
 
 The UCI Default adapter downloads automatically. The German Credit adapter downloads the UCI archive automatically. The Give Me Some Credit adapter expects `cs-training.csv` downloaded from Kaggle at `data/raw/cs-training.csv`; it does not attempt to bypass Kaggle access controls.
 
+The generalized trainer can train alternate tabular schemas into separate experiment directories:
+
+```powershell
+python scripts/train.py --dataset german_credit --output-dir artifacts/german_credit
+python scripts/train.py --dataset give_me_some_credit --output-dir artifacts/give_me_some_credit
+```
+
+Those alternate artifacts are experiment outputs and are not wired into the current credit-card `/predict` contract, which intentionally remains schema-safe. The German Credit path has been verified end-to-end; Give Me Some Credit requires its Kaggle CSV first.
+
 The policy uses configurable thresholds: low risk is approved, high risk is declined, and the middle band goes to human review. Inputs outside the expected distribution should also be reviewed. Removing sensitive fields does not prove that a model is fair, so the training report includes group-level approval and error-rate summaries. The numeric score is a presentation layer based on calibrated probability and configurable odds parameters in `configs/default.yaml`; it is not a real-world bureau score.
 
 ## API example
