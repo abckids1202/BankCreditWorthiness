@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from .explain import reason_codes, structured_reasons
+from .fairness import group_metrics
 from .features import engineer_features
 from .policy import decide, simulate_thresholds
 from .scoring import probability_to_score, risk_band
@@ -179,6 +180,7 @@ class ThresholdSimulationRequest(BaseModel):
     decline_min_risk: float = Field(ge=0, le=1)
     actual_defaults: list[int] | None = None
     costs: dict[str, FiniteFloat] | None = None
+    audit_groups: dict[str, list[str]] | None = None
 
 
 class CurrentPolicy(BaseModel):
@@ -280,7 +282,16 @@ def ready():
 @app.post("/policy/simulate")
 def policy_simulation(request: ThresholdSimulationRequest):
     try:
-        return simulate_thresholds(request.probabilities, request.approve_max_risk, request.decline_min_risk, request.actual_defaults, request.costs)
+        if request.audit_groups is not None:
+            if request.actual_defaults is None:
+                raise ValueError("actual_defaults are required when audit_groups are supplied")
+            if any(len(groups) != len(request.probabilities) for groups in request.audit_groups.values()):
+                raise ValueError("each audit group list must match the probabilities length")
+        result = simulate_thresholds(request.probabilities, request.approve_max_risk, request.decline_min_risk, request.actual_defaults, request.costs)
+        if request.audit_groups:
+            audit_frame = pd.DataFrame(request.audit_groups)
+            result["fairness"] = group_metrics(audit_frame, np.asarray(request.actual_defaults), np.asarray(request.probabilities), list(request.audit_groups), request.approve_max_risk, request.decline_min_risk, classification_threshold=request.decline_min_risk)
+        return result
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 

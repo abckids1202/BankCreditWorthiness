@@ -88,6 +88,7 @@ with tabs[1]:
         st.warning("Could not load the active policy; simulator defaults are shown.")
     probabilities_text = st.text_area("Predicted probabilities, comma-separated", "0.05, 0.12, 0.28, 0.51, 0.74")
     defaults_text = st.text_input("Optional actual defaults, comma-separated 0/1", "")
+    audit_groups_text = st.text_area("Optional audit-only groups as JSON (requires actual defaults)", '{"group": ["A", "A", "B", "B", "B"]}')
     approve = st.slider("Approve at or below", 0.0, 1.0, float(active_thresholds["approve_max_risk"]), 0.01)
     decline = st.slider("Decline at or above", 0.0, 1.0, float(active_thresholds["decline_min_risk"]), 0.01)
     cost_columns = st.columns(3)
@@ -101,7 +102,8 @@ with tabs[1]:
         try:
             probabilities = [float(value.strip()) for value in probabilities_text.split(",") if value.strip()]
             actual = [int(value.strip()) for value in defaults_text.split(",") if value.strip()] if defaults_text.strip() else None
-            st.json(api_request("POST", "/policy/simulate", json={"probabilities": probabilities, "actual_defaults": actual, "approve_max_risk": approve, "decline_min_risk": decline, "costs": {"approve_default": approve_default_cost, "decline_good": decline_good_cost, "manual_review": manual_review_cost}}))
+            audit_groups = json.loads(audit_groups_text) if audit_groups_text.strip() else None
+            st.json(api_request("POST", "/policy/simulate", json={"probabilities": probabilities, "actual_defaults": actual, "approve_max_risk": approve, "decline_min_risk": decline, "costs": {"approve_default": approve_default_cost, "decline_good": decline_good_cost, "manual_review": manual_review_cost}, "audit_groups": audit_groups}))
         except (ValueError, requests.RequestException) as exc:
             show_request_error(exc)
 with tabs[2]:

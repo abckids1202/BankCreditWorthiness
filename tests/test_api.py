@@ -196,6 +196,19 @@ def test_policy_simulation_endpoint_returns_cost_and_error_metrics():
     assert payload["decision_costs"]["approve_default"] == 8
 
 
+def test_policy_simulation_can_report_audit_only_fairness_metrics():
+    response = TestClient(app).post("/policy/simulate", json={"probabilities": [0.1, 0.3, 0.7], "approve_max_risk": 0.2, "decline_min_risk": 0.5, "actual_defaults": [0, 1, 1], "audit_groups": {"audit_group": ["A", "A", "B"]}})
+    assert response.status_code == 200
+    payload = response.json()
+    assert "fairness" in payload
+    assert payload["fairness"]["audit_group"]["A"]["approval_rate"] == pytest.approx(0.5)
+
+
+def test_policy_simulation_requires_labels_for_audit_groups():
+    response = TestClient(app).post("/policy/simulate", json={"probabilities": [0.1], "approve_max_risk": 0.2, "decline_min_risk": 0.5, "audit_groups": {"audit_group": ["A"]}})
+    assert response.status_code == 422
+
+
 def test_current_policy_endpoint_separates_policy_from_model():
     response = TestClient(app).get("/policy/current")
     assert response.status_code == 200
