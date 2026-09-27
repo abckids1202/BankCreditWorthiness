@@ -152,7 +152,15 @@ def _dataset_artifacts(dataset: str):
     model_path, metadata_path = ARTIFACT_DIR / dataset / "model.joblib", ARTIFACT_DIR / dataset / "metadata.json"
     if not model_path.exists() or not metadata_path.exists():
         raise HTTPException(503, f"Artifacts for {dataset} are unavailable. Run: python scripts/train.py --dataset {dataset}")
-    return joblib.load(model_path), json.loads(metadata_path.read_text(encoding="utf-8"))
+    try:
+        model = joblib.load(model_path)
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        checksum = hashlib.sha256(model_path.read_bytes()).hexdigest()
+        if not isinstance(metadata, dict) or metadata.get("model_sha256") != checksum or not hasattr(model, "predict_proba"):
+            raise ValueError("missing or mismatched alternate model checksum")
+        return model, metadata
+    except Exception as exc:
+        raise HTTPException(503, f"Artifacts for {dataset} failed integrity validation; retrain the dataset model") from exc
 
 
 @app.get("/health")

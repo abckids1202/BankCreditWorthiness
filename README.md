@@ -57,7 +57,7 @@ POST /predict/german_credit
 POST /predict/give_me_some_credit
 ```
 
-The endpoint validates that the feature map exactly matches the trained schema. Alternate responses are educational experiment outputs and include a warning that their thresholds and explanations are not yet specialized to that dataset.
+The endpoint validates that the feature map exactly matches the trained schema and verifies the alternate model checksum before inference. Alternate responses are educational experiment outputs and include a warning that their thresholds and explanations are not yet specialized to that dataset.
 
 Policy experiments can be run without changing the configured automatic policy through `POST /policy/simulate`. Submit a list of probabilities, approval/decline thresholds, and optionally known outcomes; the response reports approval, review, and decline rates plus observed default rates when labels are supplied. This is a research simulator, not a live policy override.
 
