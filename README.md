@@ -65,6 +65,8 @@ Project governance and design documentation is available in `docs/`: `model_card
 
 The API also exposes `GET /ready` for artifact readiness separately from `GET /health` process liveness. Every response includes an `X-Request-ID`; clients may provide their own ID for tracing, and the API logs method, path, status, and duration.
 
+For non-local use, set `CREDIT_API_KEY` in the service environment. Protected endpoints then require the matching `X-API-Key` header. Health, readiness, and API documentation routes remain public for operational checks. Leave the variable unset for the default local-development workflow.
+
 Every training run registers its artifact metadata in the local generated `artifacts/model_registry.json`. Use `GET /models` to inspect available dataset/model versions and test metrics. The registry is local experiment metadata and is intentionally not committed with generated model files.
 
 The dashboard is organized into tabs for applicant scoring, threshold simulation, model evidence, the human-review queue, and drift monitoring. Threshold simulation and drift monitoring are explicitly labeled as research/diagnostic tools and do not mutate the automatic policy or retrain a model.

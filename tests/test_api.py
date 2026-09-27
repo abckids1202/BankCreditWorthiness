@@ -21,6 +21,13 @@ def test_ready_endpoint():
     assert response.json()["status"] == "ready"
 
 
+def test_optional_api_key(monkeypatch):
+    monkeypatch.setenv("CREDIT_API_KEY", "test-secret")
+    client = TestClient(app)
+    assert client.get("/model-info").status_code == 401
+    assert client.get("/model-info", headers={"X-API-Key": "test-secret"}).status_code == 200
+
+
 def test_unknown_alternate_dataset_is_rejected():
     response = TestClient(app).post("/predict/not_a_dataset", json={"features": {}})
     assert response.status_code == 404

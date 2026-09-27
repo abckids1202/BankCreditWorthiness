@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import uuid
 from pathlib import Path
@@ -11,6 +12,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .explain import reason_codes, structured_reasons
@@ -33,7 +35,12 @@ logger = logging.getLogger("credit_simulator.api")
 async def request_context(request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     started = time.perf_counter()
-    response = await call_next(request)
+    configured_key = os.getenv("CREDIT_API_KEY")
+    public_paths = {"/health", "/ready", "/docs", "/openapi.json", "/redoc"}
+    if configured_key and request.url.path not in public_paths and request.headers.get("X-API-Key") != configured_key:
+        response = JSONResponse(status_code=401, content={"detail": "Missing or invalid X-API-Key"})
+    else:
+        response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.2f", request_id, request.method, request.url.path, response.status_code, (time.perf_counter() - started) * 1000)
     return response
