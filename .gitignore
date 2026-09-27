@@ -8,5 +8,6 @@ artifacts/
 outputs/*.json
 outputs/*.png
 outputs/reports/
+work/
 .env
 
