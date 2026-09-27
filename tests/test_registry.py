@@ -22,6 +22,7 @@ def test_registry_keeps_fingerprints_and_handles_corrupt_file(tmp_path):
     assert entry["dataset_sha256"] == "dataset-hash"
     assert entry["policy_version"] == "unknown"
     assert entry["training_config_sha256"] == "unknown"
+    assert entry["experiment_id"] == "unknown"
     path.write_text("not-json", encoding="utf-8")
     assert list_models(path) == []
 
