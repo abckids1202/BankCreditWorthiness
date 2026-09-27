@@ -97,6 +97,7 @@ class Prediction(BaseModel):
     decision_thresholds: dict[str, float]
     model_version: str
     policy_version: str
+    dataset_version: str
     dataset_version: str = "unknown"
     reason_codes: list[str]
     explanations: list[dict]
@@ -148,6 +149,8 @@ class ReviewCase(BaseModel):
     automatic_decision: Literal["approve", "manual_review", "decline"]
     reason_codes: list[str]
     warnings: list[str]
+    fairness_warnings: list[str] = []
+    data_quality_warnings: list[str] = []
     reviewer_decision: ReviewerDecision | None = None
     reviewer_note: str | None = None
     reviewer_id: str | None = None
@@ -391,6 +394,8 @@ def create_review_case(applicant: Applicant, request: Request):
     if prediction_result.decision != "manual_review":
         raise HTTPException(422, "Only manual_review recommendations can be sent to the human-review queue")
     prediction = prediction_result.model_dump()
+    prediction["fairness_warnings"] = []
+    prediction["data_quality_warnings"] = prediction_result.warnings
     return review_store.create(applicant.model_dump(), prediction)
 
 
