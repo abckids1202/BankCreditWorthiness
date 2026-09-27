@@ -1,6 +1,6 @@
 import pytest
 
-from credit_simulator.training import _approval_rate_report, _bootstrap_intervals, _candidate_specs, _data_quality
+from credit_simulator.training import _approval_rate_report, _bootstrap_intervals, _candidate_specs, _data_quality, _plots
 
 
 def test_approval_rate_report_measures_defaults_not_approved():
@@ -52,3 +52,11 @@ def test_data_quality_report_includes_ids_targets_outliers_and_categorical_summa
     assert quality["target_outside_binary_count"] == 0
     assert quality["numeric_outlier_counts_iqr"]["LIMIT_BAL"] == 1
     assert quality["categorical_summary"]["SEX"]["unique_values"] == 2
+
+
+def test_feature_distribution_plots_cover_every_numeric_feature(tmp_path):
+    frame = __import__("pandas").DataFrame({"LIMIT_BAL": [10, 20, 30, 40], "engineered/ratio": [0.1, 0.2, 0.3, 0.4], "default": [0, 1, 0, 1]})
+    _plots(frame, frame["default"], __import__("numpy").array([0.1, 0.8, 0.2, 0.7]), tmp_path, features=["LIMIT_BAL", "engineered/ratio"])
+    assert (tmp_path / "feature_distributions.png").exists()
+    assert (tmp_path / "feature_distribution_LIMIT_BAL.png").exists()
+    assert (tmp_path / "feature_distribution_engineered_ratio.png").exists()

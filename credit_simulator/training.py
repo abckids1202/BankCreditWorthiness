@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import platform
+import re
 import sys
 import shutil
 import time
@@ -160,15 +161,22 @@ def _plots(frame, y, probabilities, reports, threshold_rows=None, features=None,
             bins = pd.qcut(frame[column], q=10, duplicates="drop")
             plt.figure(figsize=(6, 4)); frame.assign(_bin=bins).groupby("_bin", observed=True)[TARGET].mean().plot(kind="bar"); plt.title(f"Default rate by {column}"); plt.ylabel("Default rate"); plt.xticks(rotation=45, ha="right"); plt.tight_layout(); plt.savefig(reports / f"default_rate_{column}.png", dpi=140); plt.close()
     if features:
-        numeric_features = [name for name in features if name in frame and pd.api.types.is_numeric_dtype(frame[name])][:12]
+        numeric_features = [name for name in features if name in frame and pd.api.types.is_numeric_dtype(frame[name])]
         if numeric_features:
-            columns = 3; rows = int(np.ceil(len(numeric_features) / columns))
+            overview_features = numeric_features[:12]
+            columns = 3; rows = int(np.ceil(len(overview_features) / columns))
             figure, axes = plt.subplots(rows, columns, figsize=(12, 3.0 * rows)); axes = np.atleast_1d(axes).ravel()
-            for axis, name in zip(axes, numeric_features):
+            for axis, name in zip(axes, overview_features):
                 axis.hist(frame[name].dropna(), bins=20, color="#4472c4", alpha=0.85)
                 axis.set_title(name); axis.set_ylabel("Rows")
-            for axis in axes[len(numeric_features):]: axis.axis("off")
-            figure.suptitle("Training-test feature distributions", y=1.01); figure.tight_layout(); figure.savefig(reports / "feature_distributions.png", dpi=140, bbox_inches="tight"); plt.close(figure)
+            for axis in axes[len(overview_features):]: axis.axis("off")
+            figure.suptitle("Training-test feature distributions (overview)", y=1.01); figure.tight_layout(); figure.savefig(reports / "feature_distributions.png", dpi=140, bbox_inches="tight"); plt.close(figure)
+            for name in numeric_features:
+                figure, axis = plt.subplots(figsize=(6, 4))
+                axis.hist(frame[name].dropna(), bins=30, color="#4472c4", alpha=0.85)
+                axis.set(title=f"Distribution: {name}", xlabel=name, ylabel="Rows")
+                safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name)).strip("_") or "feature"
+                figure.tight_layout(); figure.savefig(reports / f"feature_distribution_{safe_name}.png", dpi=140); plt.close(figure)
     if config is not None:
         decline_threshold = float(config["thresholds"]["decline_min_risk"])
         predicted_default = np.asarray(probabilities) >= decline_threshold
