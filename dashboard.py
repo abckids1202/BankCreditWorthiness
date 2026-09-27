@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import requests
@@ -16,6 +17,12 @@ st.sidebar.caption("Demographic attributes are audit-only and are excluded from 
 
 
 def api_request(method: str, path: str, **kwargs):
+    headers = dict(kwargs.pop("headers", {}) or {})
+    api_key = os.getenv("CREDIT_API_KEY")
+    if api_key:
+        headers.setdefault("X-API-Key", api_key)
+    if headers:
+        kwargs["headers"] = headers
     response = requests.request(method, f"{api_url}{path}", timeout=30, **kwargs)
     response.raise_for_status()
     return response.json()

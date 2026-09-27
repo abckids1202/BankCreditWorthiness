@@ -19,6 +19,8 @@ services:
   dashboard:
     build: .
     command: streamlit run dashboard.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      CREDIT_API_KEY: "${CREDIT_API_KEY:-}"
     ports:
       - "8501:8501"
     depends_on:
