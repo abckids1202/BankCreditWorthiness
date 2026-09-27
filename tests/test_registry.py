@@ -1,7 +1,7 @@
 import json
 import hashlib
 
-from credit_simulator.registry import list_models, register_model
+from credit_simulator.registry import list_models, promote_model, register_model
 
 
 def test_registry_registers_and_deduplicates(tmp_path):
@@ -38,3 +38,19 @@ def test_registry_reports_artifact_integrity(tmp_path):
     assert listed["checksum_valid"] is True
     model.write_bytes(b"changed")
     assert list_models(path)[0]["checksum_valid"] is False
+
+
+def test_promote_model_copies_verified_snapshot_and_updates_status(tmp_path):
+    path = tmp_path / "registry.json"
+    snapshot = tmp_path / "versions" / "v1"
+    snapshot.mkdir(parents=True)
+    model_bytes = b"verified-model"
+    (snapshot / "model.joblib").write_bytes(model_bytes)
+    checksum = hashlib.sha256(model_bytes).hexdigest()
+    (snapshot / "metadata.json").write_text(json.dumps({"model_sha256": checksum}), encoding="utf-8")
+    register_model({"dataset": "test", "model_version": "v1", "model_sha256": checksum}, snapshot, path)
+    serving = tmp_path / "serving"
+    entry = promote_model("v1", serving, path, "test")
+    assert entry["artifact_dir"].endswith("v1")
+    assert (serving / "model.joblib").read_bytes() == model_bytes
+    assert list_models(path)[0]["status"] == "active"

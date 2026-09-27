@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -51,3 +53,38 @@ def list_models(registry_path: str | Path = "artifacts/model_registry.json") -> 
                 item["checksum_valid"] = False
         enriched.append(item)
     return enriched
+
+
+def promote_model(model_version: str, serving_dir: str | Path, registry_path: str | Path = "artifacts/model_registry.json", dataset: str | None = None) -> dict:
+    """Promote one verified immutable snapshot into the serving directory.
+
+    This is deliberately an explicit operator action. Promoting an older
+    version is the rollback mechanism; training never calls this function.
+    """
+    registry_path = Path(registry_path)
+    try:
+        entries = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("model registry is unavailable or invalid") from exc
+    if not isinstance(entries, list):
+        raise ValueError("model registry must contain a list")
+    matches = [entry for entry in entries if entry.get("model_version") == model_version and (dataset is None or entry.get("dataset") == dataset)]
+    if len(matches) != 1:
+        raise ValueError("model version is not uniquely registered; specify a dataset or check the registry")
+    selected = matches[0]
+    source_dir = Path(selected.get("artifact_dir", ""))
+    source_model, source_metadata = source_dir / "model.joblib", source_dir / "metadata.json"
+    if not source_model.exists() or not source_metadata.exists() or not selected.get("model_sha256"):
+        raise ValueError("selected model snapshot is unavailable or missing a checksum")
+    if hashlib.sha256(source_model.read_bytes()).hexdigest() != selected["model_sha256"]:
+        raise ValueError("selected model snapshot failed checksum validation")
+    serving = Path(serving_dir); serving.mkdir(parents=True, exist_ok=True)
+    for source, destination in ((source_model, serving / "model.joblib"), (source_metadata, serving / "metadata.json")):
+        temporary = destination.with_suffix(destination.suffix + ".promoting")
+        shutil.copy2(source, temporary)
+        os.replace(temporary, destination)
+    for entry in entries:
+        if dataset is None or entry.get("dataset") == dataset:
+            entry["status"] = "active" if entry is selected else "retired"
+    registry_path.write_text(json.dumps(entries, indent=2, default=str), encoding="utf-8")
+    return selected
