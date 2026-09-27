@@ -143,6 +143,18 @@ def test_monitoring_drift_endpoint():
     assert response.json()["metrics"]["x"]["psi"] > 0
 
 
+def test_monitoring_drift_history_endpoint(monkeypatch, tmp_path):
+    from credit_simulator.drift_events import DriftEventStore
+
+    monkeypatch.setattr(api, "drift_store", DriftEventStore(tmp_path / "drift.db"))
+    client = TestClient(app)
+    response = client.post("/monitoring/drift", json={"reference_records": [{"x": 1}], "current_records": [{"x": 2}], "features": ["x"]})
+    assert response.status_code == 200
+    history = client.get("/monitoring/drift/history")
+    assert history.status_code == 200
+    assert history.json()[0]["current_rows"] == 1
+
+
 def test_review_history_endpoint(monkeypatch, tmp_path):
     monkeypatch.setattr(api, "review_store", ReviewStore(tmp_path / "reviews.db"))
     applicant = {"LIMIT_BAL": 1_000_000_000, "PAY_0": 0, "PAY_2": 0, "PAY_3": 0, "PAY_4": 0, "PAY_5": 0, "PAY_6": 0, "BILL_AMT1": 20000, "BILL_AMT2": 19000, "BILL_AMT3": 18000, "BILL_AMT4": 17000, "BILL_AMT5": 16000, "BILL_AMT6": 15000, "PAY_AMT1": 2000, "PAY_AMT2": 2000, "PAY_AMT3": 2000, "PAY_AMT4": 2000, "PAY_AMT5": 2000, "PAY_AMT6": 2000}

@@ -90,7 +90,6 @@ with tabs[1]:
             st.json(api_request("POST", "/policy/simulate", json={"probabilities": probabilities, "actual_defaults": actual, "approve_max_risk": approve, "decline_min_risk": decline}))
         except (ValueError, requests.RequestException) as exc:
             show_request_error(exc)
-
 with tabs[2]:
     st.subheader("Model evidence")
     report_path = Path("outputs/reports/training_report.json")
@@ -197,3 +196,10 @@ with tabs[4]:
                 st.success("No material drift detected by the configured PSI thresholds.")
         except (ValueError, requests.RequestException) as exc:
             show_request_error(exc)
+    try:
+        history = api_request("GET", "/monitoring/drift/history")
+        if history:
+            st.subheader("Recent drift diagnostics")
+            st.dataframe(history, use_container_width=True)
+    except requests.RequestException as exc:
+        show_request_error(exc)

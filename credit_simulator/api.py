@@ -27,12 +27,14 @@ from .datasets import ADAPTERS
 from .monitoring import drift_report
 from .registry import list_models
 from .predictions import PredictionEventStore
+from .drift_events import DriftEventStore
 from .rate_limit import RateLimiter
 
 
 ARTIFACT_DIR = Path("artifacts")
 review_store = ReviewStore()
 prediction_store = PredictionEventStore()
+drift_store = DriftEventStore()
 rate_limiter = RateLimiter()
 app = FastAPI(title="Explainable Credit Approval Simulator", version="0.1.0", description="Educational prototype only; not for real lending decisions.")
 logger = logging.getLogger("credit_simulator.api")
@@ -180,6 +182,19 @@ class DriftRequest(BaseModel):
     missing_critical: float = Field(default=0.15, ge=0, le=1)
 
 
+class DriftHistoryEvent(BaseModel):
+    event_id: int
+    created_at: str
+    request_id: str | None = None
+    reference_rows: int
+    current_rows: int
+    features_checked: list[str]
+    warning_features: list[str]
+    critical_features: list[str]
+    thresholds: dict[str, float]
+    recommended_action: str
+
+
 def _artifacts():
     model_path, metadata_path = ARTIFACT_DIR / "model.joblib", ARTIFACT_DIR / "metadata.json"
     if not model_path.exists() or not metadata_path.exists():
@@ -233,11 +248,18 @@ def policy_simulation(request: ThresholdSimulationRequest):
 
 
 @app.post("/monitoring/drift")
-def monitoring_drift(request: DriftRequest):
+def monitoring_drift(request: DriftRequest, http_request: Request):
     try:
-        return drift_report(request.reference_records, request.current_records, request.features, request.psi_warning, request.psi_critical, request.missing_warning, request.missing_critical)
+        report = drift_report(request.reference_records, request.current_records, request.features, request.psi_warning, request.psi_critical, request.missing_warning, request.missing_critical)
+        drift_store.record(report, getattr(http_request.state, "request_id", None))
+        return report
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/monitoring/drift/history", response_model=list[DriftHistoryEvent])
+def monitoring_drift_history(limit: int = 50):
+    return drift_store.list(limit)
 
 
 @app.get("/model-info")
