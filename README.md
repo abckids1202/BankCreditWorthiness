@@ -55,6 +55,8 @@ The endpoint validates that the feature map exactly matches the trained schema. 
 
 Policy experiments can be run without changing the configured automatic policy through `POST /policy/simulate`. Submit a list of probabilities, approval/decline thresholds, and optionally known outcomes; the response reports approval, review, and decline rates plus observed default rates when labels are supplied. This is a research simulator, not a live policy override.
 
+Input drift can be checked with `POST /monitoring/drift`. Submit reference records, current records, and optionally a feature list. The endpoint calculates PSI and missingness deltas, classifies each feature as `ok`, `warning`, or `critical`, and recommends investigation. It never retrains automatically.
+
 The policy uses configurable thresholds: low risk is approved, high risk is declined, and the middle band goes to human review. Inputs outside the expected distribution should also be reviewed. Removing sensitive fields does not prove that a model is fair, so the training report includes group-level approval and error-rate summaries. The numeric score is a presentation layer based on calibrated probability and configurable odds parameters in `configs/default.yaml`; it is not a real-world bureau score.
 
 The training report also includes detailed fairness comparisons by audit group: approval-rate differences and ratios, equal-opportunity differences, false-positive and false-negative-rate differences, calibration differences, average predicted risk, and average educational score. The default policy remains uniform across groups.

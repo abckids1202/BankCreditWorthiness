@@ -19,3 +19,9 @@ def test_policy_simulation_endpoint():
     assert response.status_code == 200
     assert response.json()["approval_rate"] == 1 / 3
 
+
+def test_monitoring_drift_endpoint():
+    response = TestClient(app).post("/monitoring/drift", json={"reference_records": [{"x": 1}, {"x": 2}], "current_records": [{"x": 100}, {"x": 100}], "features": ["x"]})
+    assert response.status_code == 200
+    assert response.json()["metrics"]["x"]["psi"] > 0
+

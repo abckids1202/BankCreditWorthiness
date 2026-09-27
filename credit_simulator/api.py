@@ -16,6 +16,7 @@ from .policy import decide, simulate_thresholds
 from .scoring import probability_to_score, risk_band
 from .review import ReviewStore
 from .datasets import ADAPTERS
+from .monitoring import drift_report
 
 
 ARTIFACT_DIR = Path("artifacts")
@@ -68,6 +69,12 @@ class ThresholdSimulationRequest(BaseModel):
     actual_defaults: list[int] | None = None
 
 
+class DriftRequest(BaseModel):
+    reference_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
+    current_records: list[dict[str, Any]] = Field(min_length=1, max_length=100000)
+    features: list[str] | None = None
+
+
 def _artifacts():
     model_path, metadata_path = ARTIFACT_DIR / "model.joblib", ARTIFACT_DIR / "metadata.json"
     if not model_path.exists() or not metadata_path.exists():
@@ -93,6 +100,14 @@ def health():
 def policy_simulation(request: ThresholdSimulationRequest):
     try:
         return simulate_thresholds(request.probabilities, request.approve_max_risk, request.decline_min_risk, request.actual_defaults)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post("/monitoring/drift")
+def monitoring_drift(request: DriftRequest):
+    try:
+        return drift_report(request.reference_records, request.current_records, request.features)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
