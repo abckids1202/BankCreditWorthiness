@@ -1,4 +1,5 @@
 import argparse
+import json
 
 from credit_simulator.datasets import get_dataset
 from credit_simulator.generic_training import train_tabular
@@ -15,9 +16,12 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     if args.dataset == "uci_default":
-        train(raw_dir=args.raw_dir, output_dir=args.output_dir or "artifacts", config_path=args.config)
+        output_dir = args.output_dir or "artifacts"
+        metadata = train(raw_dir=args.raw_dir, output_dir=output_dir, config_path=args.config)
+        print(json.dumps({"status": "trained", "dataset": args.dataset, "model_version": metadata["model_version"], "policy_version": metadata["policy_version"], "artifact_fingerprint": metadata["artifact_fingerprint"], "artifact_dir": output_dir, "metrics_test": metadata["metrics_test"]}, sort_keys=True, default=str))
     else:
         bundle = get_dataset(args.dataset, args.raw_dir)
-        metadata = train_tabular(bundle, args.output_dir or f"artifacts/{args.dataset}")
-        print(f"Trained {args.dataset}: {metadata['metrics_test']}")
+        output_dir = args.output_dir or f"artifacts/{args.dataset}"
+        metadata = train_tabular(bundle, output_dir)
+        print(json.dumps({"status": "trained", "dataset": args.dataset, "model_version": metadata["model_version"], "policy_version": metadata["policy_version"], "artifact_fingerprint": metadata["artifact_fingerprint"], "artifact_dir": output_dir, "metrics_test": metadata["metrics_test"]}, sort_keys=True, default=str))
 

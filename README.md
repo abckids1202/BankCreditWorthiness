@@ -102,6 +102,8 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/predict -ContentType "
 .\examples\requests.ps1
 ```
 
+Training prints a JSON summary containing the dataset, model version, policy version, artifact fingerprint, output directory, and held-out test metrics. The same summary format is used for alternate dataset experiments.
+
 The same sample payload is available at `examples/sample_applicant.json`; it contains no real personal information.
 
 For repeatable portfolio/demo scoring, `POST /predict/batch` accepts 1–1,000 applicants using the same schema and returns one validated prediction per applicant. Each prediction uses the same model, feature engineering, policy, explanations, and privacy-conscious event logging as single-applicant scoring.
