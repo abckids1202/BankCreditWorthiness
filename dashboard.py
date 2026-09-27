@@ -206,6 +206,28 @@ with tabs[4]:
                 st.success("No material drift detected by the configured PSI thresholds.")
         except (ValueError, requests.RequestException) as exc:
             show_request_error(exc)
+    st.subheader("Prediction and decision drift")
+    st.caption("Aggregate-only diagnostic: compare predicted default probabilities and decision rates. No applicant records are sent to this endpoint.")
+    reference_probabilities_text = st.text_area("Reference probabilities", "0.05, 0.10, 0.15, 0.20", key="reference_prediction_probabilities")
+    current_probabilities_text = st.text_area("Current probabilities", "0.08, 0.12, 0.25, 0.40", key="current_prediction_probabilities")
+    reference_decisions_text = st.text_input("Reference decisions, optional", "approve, approve, manual_review, decline", key="reference_prediction_decisions")
+    current_decisions_text = st.text_input("Current decisions, optional", "approve, manual_review, manual_review, decline", key="current_prediction_decisions")
+    if st.button("Check prediction drift"):
+        try:
+            reference_probabilities = [float(value.strip()) for value in reference_probabilities_text.split(",") if value.strip()]
+            current_probabilities = [float(value.strip()) for value in current_probabilities_text.split(",") if value.strip()]
+            reference_decisions = [value.strip() for value in reference_decisions_text.split(",") if value.strip()] or None
+            current_decisions = [value.strip() for value in current_decisions_text.split(",") if value.strip()] or None
+            result = api_request("POST", "/monitoring/predictions", json={"reference_probabilities": reference_probabilities, "current_probabilities": current_probabilities, "reference_decisions": reference_decisions, "current_decisions": current_decisions})
+            st.json(result)
+            if result["critical_metrics"]:
+                st.error("Critical prediction drift detected. Investigate before automated use.")
+            elif result["warning_metrics"]:
+                st.warning("Warning-level prediction drift detected.")
+            else:
+                st.success("No material prediction or decision-rate drift detected.")
+        except (ValueError, requests.RequestException) as exc:
+            show_request_error(exc)
     try:
         history = api_request("GET", "/monitoring/drift/history")
         if history:

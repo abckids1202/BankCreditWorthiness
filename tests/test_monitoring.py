@@ -1,4 +1,4 @@
-from credit_simulator.monitoring import drift_report
+from credit_simulator.monitoring import drift_report, prediction_drift_report
 import pytest
 
 
@@ -40,3 +40,22 @@ def test_drift_uses_custom_thresholds_and_reports_them():
 def test_drift_rejects_invalid_threshold_order():
     with pytest.raises(ValueError, match="lower"):
         drift_report([{"x": 1}], [{"x": 2}], ["x"], psi_warning=0.3, psi_critical=0.2)
+
+
+def test_prediction_drift_reports_probability_psi_and_decision_rates():
+    report = prediction_drift_report(
+        [0.05, 0.10, 0.15, 0.20],
+        [0.70, 0.80, 0.85, 0.90],
+        ["approve", "approve", "manual_review", "decline"],
+        ["decline", "decline", "decline", "manual_review"],
+    )
+    assert report["prediction_distribution"]["psi"] > 0
+    assert report["decision_rates"]["approve"]["rate_delta"] < 0
+    assert report["automatic_retraining"] is False
+
+
+def test_prediction_drift_rejects_mismatched_decision_lists_and_probabilities():
+    with pytest.raises(ValueError, match="match"):
+        prediction_drift_report([0.1, 0.2], [0.3], ["approve"], ["decline"])
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        prediction_drift_report([1.1], [0.2])

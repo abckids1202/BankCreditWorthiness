@@ -24,7 +24,7 @@ from .policy import decide, simulate_thresholds
 from .scoring import probability_to_score, risk_band
 from .review import ReviewStore
 from .datasets import ADAPTERS
-from .monitoring import drift_report
+from .monitoring import drift_report, prediction_drift_report
 from .registry import list_models
 from .predictions import PredictionEventStore
 from .drift_events import DriftEventStore
@@ -192,6 +192,17 @@ class DriftRequest(BaseModel):
     missing_critical: float = Field(default=0.15, ge=0, le=1)
 
 
+class PredictionDriftRequest(BaseModel):
+    reference_probabilities: list[FiniteFloat] = Field(min_length=1, max_length=100000)
+    current_probabilities: list[FiniteFloat] = Field(min_length=1, max_length=100000)
+    reference_decisions: list[str] | None = None
+    current_decisions: list[str] | None = None
+    psi_warning: float = Field(default=0.10, ge=0, le=1)
+    psi_critical: float = Field(default=0.25, ge=0, le=1)
+    rate_warning: float = Field(default=0.05, ge=0, le=1)
+    rate_critical: float = Field(default=0.15, ge=0, le=1)
+
+
 class DriftHistoryEvent(BaseModel):
     event_id: int
     created_at: str
@@ -290,6 +301,14 @@ def monitoring_drift(request: DriftRequest, http_request: Request):
         report["policy_version"] = policy_version
         drift_store.record(report, getattr(http_request.state, "request_id", None), model_version, policy_version)
         return report
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post("/monitoring/predictions")
+def monitoring_predictions(request: PredictionDriftRequest):
+    try:
+        return prediction_drift_report(request.reference_probabilities, request.current_probabilities, request.reference_decisions, request.current_decisions, request.psi_warning, request.psi_critical, request.rate_warning, request.rate_critical)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 

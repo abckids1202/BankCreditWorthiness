@@ -64,3 +64,47 @@ def drift_report(reference_records: list[dict], current_records: list[dict], fea
     critical = [feature for feature, values in metrics.items() if values["level"] == "critical"]
     warnings = [feature for feature, values in metrics.items() if values["level"] == "warning"]
     return {"reference_rows": len(reference), "current_rows": len(current), "features_checked": list(metrics), "metrics": metrics, "warning_features": warnings, "critical_features": critical, "thresholds": {"psi_warning": psi_warning, "psi_critical": psi_critical, "missing_warning": missing_warning, "missing_critical": missing_critical}, "recommended_action": "Investigate and pause automated use" if critical else "Investigate drift before retraining" if warnings else "No material drift detected", "automatic_retraining": False}
+
+
+def prediction_drift_report(
+    reference_probabilities: list[float],
+    current_probabilities: list[float],
+    reference_decisions: list[str] | None = None,
+    current_decisions: list[str] | None = None,
+    psi_warning: float = 0.10,
+    psi_critical: float = 0.25,
+    rate_warning: float = 0.05,
+    rate_critical: float = 0.15,
+) -> dict:
+    """Audit aggregate prediction and decision-rate drift without raw inputs."""
+    if not reference_probabilities or not current_probabilities:
+        raise ValueError("reference_probabilities and current_probabilities must both be non-empty")
+    if not 0 <= psi_warning < psi_critical or not 0 <= rate_warning < rate_critical:
+        raise ValueError("prediction drift warning thresholds must be lower than critical thresholds")
+    reference = pd.Series(reference_probabilities, dtype=float)
+    current = pd.Series(current_probabilities, dtype=float)
+    if not np.isfinite(reference).all() or not np.isfinite(current).all() or not reference.between(0, 1).all() or not current.between(0, 1).all():
+        raise ValueError("prediction probabilities must be finite values between 0 and 1")
+    probability_psi = _psi(reference, current)
+    probability_level = _level(probability_psi, psi_warning, psi_critical)
+    decision_rates = {}
+    warnings, critical = [], []
+    if reference_decisions is not None or current_decisions is not None:
+        if reference_decisions is None or current_decisions is None or len(reference_decisions) != len(reference) or len(current_decisions) != len(current):
+            raise ValueError("decision lists must be supplied together and match their probability lists")
+        categories = sorted(set(reference_decisions) | set(current_decisions))
+        for decision in categories:
+            reference_rate = float(sum(value == decision for value in reference_decisions) / len(reference_decisions))
+            current_rate = float(sum(value == decision for value in current_decisions) / len(current_decisions))
+            delta = current_rate - reference_rate
+            level = _missingness_level(delta, rate_warning, rate_critical)
+            decision_rates[decision] = {"reference_rate": reference_rate, "current_rate": current_rate, "rate_delta": delta, "level": level}
+            if level == "critical":
+                critical.append(f"decision:{decision}")
+            elif level == "warning":
+                warnings.append(f"decision:{decision}")
+    if probability_level == "critical":
+        critical.insert(0, "default_probability")
+    elif probability_level == "warning":
+        warnings.insert(0, "default_probability")
+    return {"reference_rows": len(reference), "current_rows": len(current), "prediction_distribution": {"psi": probability_psi, "level": probability_level}, "decision_rates": decision_rates, "warning_metrics": warnings, "critical_metrics": critical, "thresholds": {"psi_warning": psi_warning, "psi_critical": psi_critical, "rate_warning": rate_warning, "rate_critical": rate_critical}, "recommended_action": "Investigate and pause automated use" if critical else "Investigate prediction shift before retraining" if warnings else "No material prediction drift detected", "automatic_retraining": False}

@@ -185,6 +185,13 @@ def test_monitoring_drift_endpoint():
     assert response.json()["metrics"]["x"]["psi"] > 0
 
 
+def test_monitoring_prediction_endpoint():
+    response = TestClient(app).post("/monitoring/predictions", json={"reference_probabilities": [0.1, 0.2], "current_probabilities": [0.8, 0.9], "reference_decisions": ["approve", "manual_review"], "current_decisions": ["decline", "decline"]})
+    assert response.status_code == 200
+    assert response.json()["prediction_distribution"]["psi"] > 0
+    assert "decline" in response.json()["decision_rates"]
+
+
 def test_monitoring_drift_history_endpoint(monkeypatch, tmp_path):
     from credit_simulator.drift_events import DriftEventStore
 
