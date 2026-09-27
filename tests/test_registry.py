@@ -11,6 +11,7 @@ def test_registry_registers_and_deduplicates(tmp_path):
     register_model(metadata, tmp_path / "artifact", path)
     assert len(list_models(path)) == 1
     assert json.loads(path.read_text(encoding="utf-8"))[0]["status"] == "available"
+    assert not list(tmp_path.glob(".registry.json.*.tmp"))
 
 
 def test_registry_keeps_fingerprints_and_handles_corrupt_file(tmp_path):

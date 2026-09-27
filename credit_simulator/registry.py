@@ -4,8 +4,29 @@ import json
 import hashlib
 import os
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+
+
+def _write_registry(path: Path, entries: list[dict]) -> None:
+    """Replace registry JSON atomically within the same filesystem."""
+    temporary_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False) as handle:
+            temporary_path = handle.name
+            json.dump(entries, handle, indent=2, default=str)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path:
+            try:
+                os.unlink(temporary_path)
+            except FileNotFoundError:
+                pass
 
 
 def register_model(metadata: dict, artifact_dir: str | Path, registry_path: str | Path = "artifacts/model_registry.json") -> dict:
@@ -25,7 +46,7 @@ def register_model(metadata: dict, artifact_dir: str | Path, registry_path: str 
     entry = {"dataset": dataset_name, "model_version": metadata.get("model_version", "unknown"), "policy_version": metadata.get("policy_version", "unknown"), "training_config_sha256": metadata.get("training_config_sha256", "unknown"), "artifact_fingerprint": metadata.get("artifact_fingerprint"), "model_sha256": metadata.get("model_sha256"), "dataset_sha256": metadata.get("dataset_sha256", dataset.get("sha256") if isinstance(dataset, dict) else None), "artifact_dir": artifact, "selected_model": metadata.get("selected_model", "generic"), "metrics_test": metadata.get("metrics_test", {}), "registered_at": datetime.now(timezone.utc).isoformat(), "status": "available"}
     entries = [item for item in entries if not (item.get("artifact_dir") == artifact and item.get("model_version") == entry["model_version"])]
     entries.append(entry)
-    registry_path.write_text(json.dumps(entries, indent=2, default=str), encoding="utf-8")
+    _write_registry(registry_path, entries)
     return entry
 
 
@@ -88,5 +109,5 @@ def promote_model(model_version: str, serving_dir: str | Path, registry_path: st
     for entry in entries:
         if dataset is None or entry.get("dataset") == dataset:
             entry["status"] = "active" if entry is selected else "retired"
-    registry_path.write_text(json.dumps(entries, indent=2, default=str), encoding="utf-8")
+    _write_registry(registry_path, entries)
     return selected
