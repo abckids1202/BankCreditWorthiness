@@ -71,6 +71,15 @@ class Prediction(BaseModel):
     educational_disclaimer: str
 
 
+class BatchPredictionRequest(BaseModel):
+    applicants: list[Applicant] = Field(min_length=1, max_length=1000)
+
+
+class BatchPredictionResponse(BaseModel):
+    count: int
+    predictions: list[Prediction]
+
+
 class DatasetPredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     features: dict[str, Any]
@@ -178,6 +187,12 @@ def predict(applicant: Applicant, request: Request):
     score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
     prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None))
     return Prediction(risk_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+
+
+@app.post("/predict/batch", response_model=BatchPredictionResponse)
+def predict_batch(batch: BatchPredictionRequest, request: Request):
+    predictions = [predict(applicant, request) for applicant in batch.applicants]
+    return BatchPredictionResponse(count=len(predictions), predictions=predictions)
 
 
 @app.post("/predict/{dataset}", response_model=DatasetPrediction)
