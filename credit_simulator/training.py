@@ -29,7 +29,7 @@ from sklearn.preprocessing import StandardScaler
 
 from .config import load_config
 from .data import PROTECTED, TARGET, load_uci_data, model_features, validate_frame, validate_no_leakage, validate_missingness
-from .features import engineer_features, engineered_feature_descriptions
+from .features import engineer_features, engineered_feature_descriptions, engineered_feature_metadata
 from .fairness import group_metrics, threshold_sensitivity
 from .registry import register_model
 
@@ -307,6 +307,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     threshold_rows = _threshold_report(y_test, test_probabilities, config)
     approval_rate_rows = _approval_rate_report(y_test, test_probabilities)
     feature_descriptions = engineered_feature_descriptions()
+    feature_metadata = engineered_feature_metadata()
     global_importance = _global_feature_importance(selected, X_test, y_test, features, feature_descriptions, config["random_state"])
     dataset_hash = hashlib.sha256(frame.to_csv(index=False).encode("utf-8")).hexdigest()
     training_timestamp = datetime.now(timezone.utc).isoformat()
@@ -332,7 +333,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
     fairness_detailed = group_metrics(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], config["thresholds"]["approve_max_risk"], config["thresholds"]["decline_min_risk"])
     fairness_sensitivity = threshold_sensitivity(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], [(0.10, 0.30), (0.20, 0.45), (0.30, 0.60)])
-    report = {"experiment_id": experiment_id, "dataset_summary": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "license": "UCI Machine Learning Repository dataset terms; cite Yeh and Lien (2009)", "rows": int(len(frame)), "feature_count": int(len(features)), "target_name": TARGET, "positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "training_timestamp": training_timestamp, "dataset_sha256": dataset_hash, "split_overlap": split_overlap, "class_imbalance_ratio": float((y == 0).sum() / max((y == 1).sum(), 1))}, "training_config": config, "training_config_sha256": config_sha256, "runtime": runtime, "data_quality": _data_quality(frame, features), "feature_engineering": feature_descriptions, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed, "fairness_threshold_sensitivity": fairness_sensitivity}
+    report = {"experiment_id": experiment_id, "dataset_summary": {"name": "UCI Default of Credit Card Clients", "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "license": "UCI Machine Learning Repository dataset terms; cite Yeh and Lien (2009)", "rows": int(len(frame)), "feature_count": int(len(features)), "target_name": TARGET, "positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "training_timestamp": training_timestamp, "dataset_sha256": dataset_hash, "split_overlap": split_overlap, "class_imbalance_ratio": float((y == 0).sum() / max((y == 1).sum(), 1))}, "training_config": config, "training_config_sha256": config_sha256, "runtime": runtime, "data_quality": _data_quality(frame, features), "feature_engineering": feature_metadata, "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "test_metric_bootstrap": bootstrap, "calibration": calibration, "threshold_analysis": threshold_rows, "approval_rate_analysis": approval_rate_rows, "global_feature_importance": global_importance, "fairness": fairness, "fairness_detailed": fairness_detailed, "fairness_threshold_sensitivity": fairness_sensitivity}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     register_model(metadata, version_dir)
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")

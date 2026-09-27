@@ -105,3 +105,28 @@ def engineered_feature_descriptions() -> dict[str, str]:
         **{f"{column}_missing": f"Indicator that raw field {column} was missing at scoring time" for column in RAW_FEATURE_COLUMNS},
         "missing_value_count": "Number of missing raw fields at scoring time",
     }
+
+
+def engineered_feature_metadata() -> dict[str, dict[str, str]]:
+    """Describe engineered fields and record their decision-time leakage review."""
+    descriptions = engineered_feature_descriptions()
+    metadata = {}
+    for name, definition in descriptions.items():
+        if name.endswith("_missing") or name == "missing_value_count":
+            unit = "count / binary missingness indicator"
+        elif any(token in name for token in ("utilization", "payment_to_bill_ratio")):
+            unit = "ratio"
+        elif any(token in name for token in ("count", "months", "consecutive", "active")):
+            unit = "months or event count"
+        elif "trend" in name:
+            unit = "change per month index"
+        elif "late_payment" in name or "payment_delay" in name:
+            unit = "repayment-status severity score"
+        else:
+            unit = "dataset currency units or standard deviation"
+        metadata[name] = {
+            "definition": definition,
+            "unit_or_interpretation": unit,
+            "leakage_review": "Computed only from the six historical decision-time months; excludes target and post-decision outcomes.",
+        }
+    return metadata

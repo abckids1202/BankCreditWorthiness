@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from credit_simulator.features import engineer_features
+from credit_simulator.features import engineer_features, engineered_feature_metadata
 
 
 def test_feature_engineering_adds_behavioral_features():
@@ -29,3 +29,11 @@ def test_feature_engineering_adds_missingness_indicators_without_using_target():
     assert output.loc[0, "missing_value_count"] == 1
     assert "default" in output.columns
     assert "default_missing" not in output.columns
+
+
+def test_engineered_feature_metadata_records_units_and_leakage_review():
+    metadata = engineered_feature_metadata()
+    assert "current_utilization" in metadata
+    assert metadata["current_utilization"]["unit_or_interpretation"] == "ratio"
+    assert "decision-time" in metadata["current_utilization"]["leakage_review"]
+    assert all(set(entry) == {"definition", "unit_or_interpretation", "leakage_review"} for entry in metadata.values())
