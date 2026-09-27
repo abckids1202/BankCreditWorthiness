@@ -19,6 +19,7 @@ def test_registry_keeps_fingerprints_and_handles_corrupt_file(tmp_path):
     entry = register_model(metadata, tmp_path / "artifact", path)
     assert entry["artifact_fingerprint"] == "abc"
     assert entry["dataset_sha256"] == "dataset-hash"
+    assert entry["policy_version"] == "unknown"
     path.write_text("not-json", encoding="utf-8")
     assert list_models(path) == []
 
@@ -54,3 +55,10 @@ def test_promote_model_copies_verified_snapshot_and_updates_status(tmp_path):
     assert entry["artifact_dir"].endswith("v1")
     assert (serving / "model.joblib").read_bytes() == model_bytes
     assert list_models(path)[0]["status"] == "active"
+
+
+def test_registry_exposes_policy_version(tmp_path):
+    path = tmp_path / "registry.json"
+    entry = register_model({"dataset": "test", "model_version": "v2", "policy_version": "policy-2", "metrics_test": {}}, tmp_path / "artifact", path)
+    assert entry["policy_version"] == "policy-2"
+    assert list_models(path)[0]["policy_version"] == "policy-2"
