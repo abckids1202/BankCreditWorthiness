@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .explain import reason_codes, structured_reasons
 from .features import engineer_features
-from .policy import decide
+from .policy import decide, simulate_thresholds
 from .scoring import probability_to_score, risk_band
 from .review import ReviewStore
 from .datasets import ADAPTERS
@@ -61,6 +61,13 @@ class DatasetPrediction(BaseModel):
     educational_disclaimer: str
 
 
+class ThresholdSimulationRequest(BaseModel):
+    probabilities: list[float] = Field(min_length=1, max_length=100000)
+    approve_max_risk: float = Field(ge=0, le=1)
+    decline_min_risk: float = Field(ge=0, le=1)
+    actual_defaults: list[int] | None = None
+
+
 def _artifacts():
     model_path, metadata_path = ARTIFACT_DIR / "model.joblib", ARTIFACT_DIR / "metadata.json"
     if not model_path.exists() or not metadata_path.exists():
@@ -80,6 +87,14 @@ def _dataset_artifacts(dataset: str):
 @app.get("/health")
 def health():
     return {"status": "ok", "model_ready": (ARTIFACT_DIR / "model.joblib").exists()}
+
+
+@app.post("/policy/simulate")
+def policy_simulation(request: ThresholdSimulationRequest):
+    try:
+        return simulate_thresholds(request.probabilities, request.approve_max_risk, request.decline_min_risk, request.actual_defaults)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @app.get("/model-info")

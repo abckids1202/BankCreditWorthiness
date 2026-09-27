@@ -13,3 +13,9 @@ def test_unknown_alternate_dataset_is_rejected():
     response = TestClient(app).post("/predict/not_a_dataset", json={"features": {}})
     assert response.status_code == 404
 
+
+def test_policy_simulation_endpoint():
+    response = TestClient(app).post("/policy/simulate", json={"probabilities": [0.1, 0.3, 0.7], "approve_max_risk": 0.2, "decline_min_risk": 0.5})
+    assert response.status_code == 200
+    assert response.json()["approval_rate"] == 1 / 3
+

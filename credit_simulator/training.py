@@ -23,6 +23,7 @@ from sklearn.preprocessing import StandardScaler
 from .config import load_config
 from .data import PROTECTED, TARGET, load_uci_data, model_features, validate_frame, validate_no_leakage, validate_missingness
 from .features import engineer_features, engineered_feature_descriptions
+from .fairness import group_metrics
 
 
 def _metrics(y_true, probabilities, threshold=0.5):
@@ -139,7 +140,8 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     fairness_frame = frame_test.copy()
     fairness_frame["AGE_BIN"] = pd.cut(fairness_frame["AGE"], bins=[0, 25, 35, 50, np.inf], labels=["<=25", "26-35", "36-50", "51+"])
     fairness = _fairness(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"])
-    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": engineered_feature_descriptions(), "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "calibration": calibration, "threshold_analysis": threshold_rows, "fairness": fairness}
+    fairness_detailed = group_metrics(fairness_frame, y_test.to_numpy(), test_probabilities, ["SEX", "AGE_BIN"], config["thresholds"]["approve_max_risk"], config["thresholds"]["decline_min_risk"])
+    report = {"dataset_summary": {"positive_class": int(y.sum()), "negative_class": int((1-y).sum()), "default_rate": float(y.mean()), "train_rows": len(X_train), "validation_rows": len(X_valid), "test_rows": len(X_test), "random_state": config["random_state"], "dataset_sha256": dataset_hash}, "data_quality": _data_quality(frame, features), "feature_engineering": engineered_feature_descriptions(), "candidate_metrics": metrics, "selected_model": selected_name, "test_metrics": test_metrics, "calibration": calibration, "threshold_analysis": threshold_rows, "fairness": fairness, "fairness_detailed": fairness_detailed}
     (reports / "metrics.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     pd.DataFrame(threshold_rows).to_csv(report_dir / "threshold_analysis.csv", index=False)
