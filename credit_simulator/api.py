@@ -102,8 +102,8 @@ class Prediction(BaseModel):
     risk_probability: FiniteFloat = Field(ge=0, le=1)
     default_probability: FiniteFloat = Field(ge=0, le=1)
     credit_score: int = Field(ge=300, le=850)
-    risk_band: str
-    decision: str
+    risk_band: Literal["low", "moderate", "high", "very_high"]
+    decision: Literal["approve", "manual_review", "decline"]
     rationale: str
     decision_thresholds: dict[str, float]
     model_version: str
@@ -137,8 +137,8 @@ class DatasetPrediction(BaseModel):
     risk_probability: FiniteFloat = Field(ge=0, le=1)
     default_probability: FiniteFloat = Field(ge=0, le=1)
     credit_score: int = Field(ge=300, le=850)
-    risk_band: str
-    decision: str
+    risk_band: Literal["low", "moderate", "high", "very_high"]
+    decision: Literal["approve", "manual_review", "decline"]
     model_version: str
     experiment_id: str = "unknown"
     policy_version: str

@@ -71,6 +71,15 @@ def test_explanation_schema_is_typed_and_rejects_invalid_values():
         api.Explanation(feature="late_payment_count", description="Late payments", direction="increased_risk", importance=0.21, explanation_method="local_feature_ablation", extra_field=True)
 
 
+def test_prediction_policy_values_are_constrained():
+    common = {"risk_probability": 0.2, "default_probability": 0.2, "credit_score": 700, "risk_band": "low", "decision": "approve", "rationale": "test", "decision_thresholds": {}, "model_version": "test", "policy_version": "test", "reason_codes": [], "explanations": [], "warnings": [], "educational_disclaimer": "test"}
+    assert api.Prediction(**common).decision == "approve"
+    with pytest.raises(ValueError):
+        api.Prediction(**{**common, "decision": "accept"})
+    with pytest.raises(ValueError):
+        api.Prediction(**{**common, "risk_band": "unknown"})
+
+
 def test_ready_endpoint():
     response = TestClient(app).get("/ready")
     assert response.status_code == 200
