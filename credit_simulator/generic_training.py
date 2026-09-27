@@ -8,6 +8,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -29,11 +30,19 @@ def train_tabular(bundle: DatasetBundle, output_dir: str | Path, random_state: i
     endpoint schema is added for each alternate dataset.
     """
     output = Path(output_dir); output.mkdir(parents=True, exist_ok=True)
+    if bundle.target not in bundle.frame.columns:
+        raise ValueError(f"Target column is missing: {bundle.target}")
     features = [column for column in bundle.feature_columns if column not in set(bundle.protected_attributes)]
+    missing_features = sorted(set(features).difference(bundle.frame.columns))
+    if missing_features or not features:
+        raise ValueError(f"Alternate dataset feature schema is invalid: {missing_features or 'no model features'}")
     suspicious = [name for name in features if str(name).lower() in {"target", "label", "default"} or str(name).lower() == str(bundle.target).lower()]
     if suspicious:
         raise ValueError(f"Potential target leakage in alternate model features: {suspicious}")
-    X, y = bundle.frame[features], bundle.frame[bundle.target].astype(int)
+    target = pd.to_numeric(bundle.frame[bundle.target], errors="coerce")
+    if target.isna().any() or not set(target.unique()).issubset({0, 1}):
+        raise ValueError("Alternate dataset target must be binary and non-null")
+    X, y = bundle.frame[features], target.astype(int)
     numeric = X.select_dtypes(include=np.number).columns.tolist(); categorical = [column for column in features if column not in numeric]
     preprocess = ColumnTransformer([("numeric", Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())]), numeric), ("categorical", Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore"))]), categorical)], remainder="drop")
     base = Pipeline([("preprocess", preprocess), ("model", LogisticRegression(max_iter=1500, class_weight="balanced", random_state=random_state))])
