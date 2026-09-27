@@ -5,9 +5,10 @@ import pytest
 
 def test_review_case_preserves_model_decision(tmp_path):
     store = ReviewStore(tmp_path / "reviews.db")
-    case = store.create({"LIMIT_BAL": 1000}, {"model_version": "test", "policy_version": "policy-0.1.0", "risk_probability": 0.3, "credit_score": 600, "decision": "manual_review", "reason_codes": ["test"], "warnings": []})
+    case = store.create({"LIMIT_BAL": 1000}, {"model_version": "test", "policy_version": "policy-0.1.0", "decision_thresholds": {"approve_max_risk": 0.2, "decline_min_risk": 0.45}, "risk_probability": 0.3, "credit_score": 600, "decision": "manual_review", "reason_codes": ["test"], "warnings": []})
     assert case["automatic_decision"] == "manual_review"
     assert case["policy_version"] == "policy-0.1.0"
+    assert case["decision_thresholds"]["approve_max_risk"] == 0.2
     assert store.history(case["case_id"])[0]["event_type"] == "created"
     updated = store.update(case["case_id"], "approved", "Reviewed for prototype", "reviewer-demo")
     assert updated["automatic_decision"] == "manual_review"
@@ -52,6 +53,7 @@ def test_review_store_migrates_existing_schema(tmp_path):
     assert store.history("legacy-case")[0]["event_type"] == "created"
     case = store.create({"LIMIT_BAL": 1000}, {"model_version": "legacy-compatible", "risk_probability": 0.2, "credit_score": 650, "decision": "approve", "reason_codes": [], "warnings": []})
     assert case["policy_version"] == "unknown"
+    assert case["decision_thresholds"] == {}
 
 
 def test_review_update_schema_rejects_unknown_decision():
