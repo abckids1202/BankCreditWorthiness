@@ -25,7 +25,7 @@ from .policy import decide, simulate_thresholds
 from .scoring import probability_to_score, risk_band
 from .review import ReviewStore
 from .datasets import ADAPTERS
-from .monitoring import drift_report, prediction_drift_report
+from .monitoring import drift_report, fairness_drift_report, prediction_drift_report
 from .registry import list_models
 from .predictions import PredictionEventStore
 from .drift_events import DriftEventStore
@@ -212,6 +212,13 @@ class PredictionDriftRequest(BaseModel):
     current_defaults: list[int] | None = None
 
 
+class FairnessDriftRequest(BaseModel):
+    reference_metrics: dict[str, Any]
+    current_metrics: dict[str, Any]
+    delta_warning: float = Field(default=0.05, ge=0, le=1)
+    delta_critical: float = Field(default=0.15, ge=0, le=1)
+
+
 class DriftHistoryEvent(BaseModel):
     event_id: int
     created_at: str
@@ -327,6 +334,14 @@ def monitoring_drift(request: DriftRequest, http_request: Request):
 def monitoring_predictions(request: PredictionDriftRequest):
     try:
         return prediction_drift_report(request.reference_probabilities, request.current_probabilities, request.reference_decisions, request.current_decisions, request.psi_warning, request.psi_critical, request.rate_warning, request.rate_critical, request.reference_defaults, request.current_defaults)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post("/monitoring/fairness")
+def monitoring_fairness(request: FairnessDriftRequest):
+    try:
+        return fairness_drift_report(request.reference_metrics, request.current_metrics, request.delta_warning, request.delta_critical)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from collections.abc import Mapping
 
 
 def _psi(reference: pd.Series, current: pd.Series, bins: int = 10) -> float:
@@ -144,3 +145,47 @@ def prediction_drift_report(
         elif calibration_level == "warning":
             warnings.append("calibration")
     return {"reference_rows": len(reference), "current_rows": len(current), "prediction_distribution": {"psi": probability_psi, "level": probability_level}, "decision_rates": decision_rates, "label_metrics": label_metrics, "warning_metrics": warnings, "critical_metrics": critical, "thresholds": {"psi_warning": psi_warning, "psi_critical": psi_critical, "rate_warning": rate_warning, "rate_critical": rate_critical}, "recommended_action": "Investigate and pause automated use" if critical else "Investigate prediction shift before retraining" if warnings else "No material prediction drift detected", "automatic_retraining": False}
+
+
+def _flatten_numeric(values: Mapping, prefix: str = "") -> dict[str, float]:
+    flattened = {}
+    for key, value in values.items():
+        name = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, Mapping):
+            flattened.update(_flatten_numeric(value, name))
+        elif isinstance(value, (int, float)) and not isinstance(value, bool) and np.isfinite(value):
+            flattened[name] = float(value)
+    return flattened
+
+
+def fairness_drift_report(reference_metrics: Mapping, current_metrics: Mapping, delta_warning: float = 0.05, delta_critical: float = 0.15) -> dict:
+    """Compare aggregate fairness summaries without accepting applicant-level data."""
+    if not reference_metrics or not current_metrics:
+        raise ValueError("reference_metrics and current_metrics must both be non-empty")
+    if not 0 <= delta_warning < delta_critical:
+        raise ValueError("fairness drift warning threshold must be lower than critical threshold")
+    reference = _flatten_numeric(reference_metrics)
+    current = _flatten_numeric(current_metrics)
+    common = sorted(set(reference) & set(current))
+    if not common:
+        raise ValueError("reference and current fairness summaries have no common numeric metrics")
+    metrics = {}
+    warning_metrics, critical_metrics = [], []
+    for name in common:
+        delta = current[name] - reference[name]
+        level = _missingness_level(delta, delta_warning, delta_critical)
+        metrics[name] = {"reference": reference[name], "current": current[name], "delta": delta, "absolute_delta": abs(delta), "level": level}
+        if level == "critical":
+            critical_metrics.append(name)
+        elif level == "warning":
+            warning_metrics.append(name)
+    return {
+        "metrics": metrics,
+        "missing_from_current": sorted(set(reference) - set(current)),
+        "new_in_current": sorted(set(current) - set(reference)),
+        "warning_metrics": warning_metrics,
+        "critical_metrics": critical_metrics,
+        "thresholds": {"delta_warning": delta_warning, "delta_critical": delta_critical},
+        "recommended_action": "Investigate fairness shift and pause automated use" if critical_metrics else "Investigate fairness shift before retraining" if warning_metrics else "No material fairness drift detected",
+        "automatic_retraining": False,
+    }

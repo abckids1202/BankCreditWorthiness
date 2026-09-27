@@ -241,6 +241,22 @@ with tabs[4]:
                 st.success("No material prediction or decision-rate drift detected.")
         except (ValueError, requests.RequestException) as exc:
             show_request_error(exc)
+    st.subheader("Fairness metric drift")
+    st.caption("Aggregate-only diagnostic: compare saved group fairness summaries across periods. Do not paste applicant-level records.")
+    fairness_reference_text = st.text_area("Reference fairness summary", '{"SEX": {"A": {"approval_rate": 0.80, "false_positive_rate": 0.10}}}', key="fairness_reference_summary")
+    fairness_current_text = st.text_area("Current fairness summary", '{"SEX": {"A": {"approval_rate": 0.60, "false_positive_rate": 0.12}}}', key="fairness_current_summary")
+    if st.button("Check fairness drift"):
+        try:
+            result = api_request("POST", "/monitoring/fairness", json={"reference_metrics": json.loads(fairness_reference_text), "current_metrics": json.loads(fairness_current_text)})
+            st.json(result)
+            if result["critical_metrics"]:
+                st.error("Critical fairness drift detected. Investigate before automated use.")
+            elif result["warning_metrics"]:
+                st.warning("Warning-level fairness drift detected.")
+            else:
+                st.success("No material fairness drift detected.")
+        except (ValueError, requests.RequestException) as exc:
+            show_request_error(exc)
     try:
         history = api_request("GET", "/monitoring/drift/history")
         if history:

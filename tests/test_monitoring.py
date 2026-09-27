@@ -1,4 +1,4 @@
-from credit_simulator.monitoring import drift_report, prediction_drift_report
+from credit_simulator.monitoring import drift_report, fairness_drift_report, prediction_drift_report
 import pytest
 
 
@@ -72,3 +72,18 @@ def test_prediction_drift_reports_labeled_default_and_calibration_drift():
     assert report["label_metrics"]["default_rate_delta"] > 0
     assert "default_rate" in report["critical_metrics"]
     assert "calibration_level" in report["label_metrics"]
+
+
+def test_fairness_drift_compares_nested_group_metrics():
+    report = fairness_drift_report(
+        {"SEX": {"A": {"approval_rate": 0.8, "false_positive_rate": 0.1}}},
+        {"SEX": {"A": {"approval_rate": 0.6, "false_positive_rate": 0.12}}},
+    )
+    assert report["metrics"]["SEX.A.approval_rate"]["level"] == "critical"
+    assert report["metrics"]["SEX.A.false_positive_rate"]["level"] == "ok"
+    assert report["automatic_retraining"] is False
+
+
+def test_fairness_drift_rejects_invalid_thresholds():
+    with pytest.raises(ValueError, match="lower"):
+        fairness_drift_report({"metric": 0.1}, {"metric": 0.2}, 0.2, 0.1)

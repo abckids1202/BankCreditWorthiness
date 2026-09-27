@@ -237,6 +237,12 @@ def test_monitoring_prediction_endpoint_accepts_labels():
     assert response.json()["label_metrics"]["default_rate_delta"] == 1.0
 
 
+def test_monitoring_fairness_endpoint():
+    response = TestClient(app).post("/monitoring/fairness", json={"reference_metrics": {"group": {"A": {"approval_rate": 0.8}}}, "current_metrics": {"group": {"A": {"approval_rate": 0.6}}}})
+    assert response.status_code == 200
+    assert response.json()["metrics"]["group.A.approval_rate"]["level"] == "critical"
+
+
 def test_monitoring_drift_history_endpoint(monkeypatch, tmp_path):
     from credit_simulator.drift_events import DriftEventStore
 
