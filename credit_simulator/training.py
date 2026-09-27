@@ -58,7 +58,7 @@ def _data_quality(frame, features):
     return {"rows": int(len(frame)), "columns": int(len(frame.columns)), "duplicate_rows": int(frame.duplicated().sum()), "missing_by_column": {str(k): float(v) for k, v in frame.isna().mean().items()}, "constant_columns": [str(c) for c in frame.columns if frame[c].nunique(dropna=False) <= 1], "numeric_summary": json.loads(numeric.describe(percentiles=[0.01, 0.5, 0.99]).transpose().to_json())}
 
 
-def _plots(frame, y, probabilities, reports):
+def _plots(frame, y, probabilities, reports, threshold_rows=None, features=None, config=None):
     reports.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(5, 4)); y.value_counts().sort_index().plot(kind="bar"); plt.title("Target class balance"); plt.xlabel("Default"); plt.ylabel("Rows"); plt.tight_layout(); plt.savefig(reports / "target_balance.png", dpi=140); plt.close()
     plt.figure(figsize=(6, 4)); plt.hist(probabilities[np.asarray(y) == 0], bins=30, alpha=0.6, label="non-default"); plt.hist(probabilities[np.asarray(y) == 1], bins=30, alpha=0.6, label="default"); plt.legend(); plt.title("Predicted-risk distributions"); plt.xlabel("Predicted probability"); plt.tight_layout(); plt.savefig(reports / "risk_distribution.png", dpi=140); plt.close()
@@ -69,6 +69,34 @@ def _plots(frame, y, probabilities, reports):
         if column in frame:
             bins = pd.qcut(frame[column], q=10, duplicates="drop")
             plt.figure(figsize=(6, 4)); frame.assign(_bin=bins).groupby("_bin", observed=True)[TARGET].mean().plot(kind="bar"); plt.title(f"Default rate by {column}"); plt.ylabel("Default rate"); plt.xticks(rotation=45, ha="right"); plt.tight_layout(); plt.savefig(reports / f"default_rate_{column}.png", dpi=140); plt.close()
+    if features:
+        numeric_features = [name for name in features if name in frame and pd.api.types.is_numeric_dtype(frame[name])][:12]
+        if numeric_features:
+            columns = 3; rows = int(np.ceil(len(numeric_features) / columns))
+            figure, axes = plt.subplots(rows, columns, figsize=(12, 3.0 * rows)); axes = np.atleast_1d(axes).ravel()
+            for axis, name in zip(axes, numeric_features):
+                axis.hist(frame[name].dropna(), bins=20, color="#4472c4", alpha=0.85)
+                axis.set_title(name); axis.set_ylabel("Rows")
+            for axis in axes[len(numeric_features):]: axis.axis("off")
+            figure.suptitle("Training-test feature distributions", y=1.01); figure.tight_layout(); figure.savefig(reports / "feature_distributions.png", dpi=140, bbox_inches="tight"); plt.close(figure)
+    if config is not None:
+        decline_threshold = float(config["thresholds"]["decline_min_risk"])
+        predicted_default = np.asarray(probabilities) >= decline_threshold
+        matrix = confusion_matrix(np.asarray(y), predicted_default, labels=[0, 1])
+        figure, axis = plt.subplots(figsize=(5, 4)); image = axis.imshow(matrix, cmap="Blues")
+        axis.set(xticks=[0, 1], yticks=[0, 1], xticklabels=["Non-default", "Default"], yticklabels=["Non-default", "Default"], xlabel="Predicted", ylabel="Actual", title=f"Confusion matrix at {decline_threshold:.2f} risk")
+        for row in range(2):
+            for column in range(2): axis.text(column, row, int(matrix[row, column]), ha="center", va="center", color="white" if matrix[row, column] > matrix.max() / 2 else "black")
+        figure.colorbar(image, ax=axis); figure.tight_layout(); figure.savefig(reports / "confusion_matrix.png", dpi=140); plt.close(figure)
+    if threshold_rows:
+        table = pd.DataFrame(threshold_rows)
+        if config is not None:
+            target_approve = float(config["thresholds"]["approve_max_risk"])
+            table = table.iloc[(table["approve_max_risk"] - target_approve).abs().argsort()[:max(1, len(table) // 20)]]
+        table = table.sort_values("decline_min_risk")
+        figure, axis = plt.subplots(figsize=(7, 4));
+        for column, label in [("approval_rate", "Approve"), ("review_rate", "Manual review"), ("decline_rate", "Decline")]: axis.plot(table["decline_min_risk"], table[column], marker="o", label=label)
+        axis.set(xlabel="Decline threshold", ylabel="Population rate", title="Decision population by threshold"); axis.set_ylim(0, 1); axis.legend(); figure.tight_layout(); figure.savefig(reports / "threshold_comparison.png", dpi=140); plt.close(figure)
 
 
 def _pipeline(kind: str, random_state: int):
@@ -153,7 +181,7 @@ def train(output_dir: str | Path = "artifacts", raw_dir: str | Path = "data/raw"
     (report_dir / "training_report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     pd.DataFrame(threshold_rows).to_csv(report_dir / "threshold_analysis.csv", index=False)
     (report_dir / "feature_summary.json").write_text(json.dumps(_data_quality(frame, features), indent=2, default=str), encoding="utf-8")
-    _plots(frame_test, y_test, test_probabilities, report_dir)
+    _plots(frame_test, y_test, test_probabilities, report_dir, threshold_rows=threshold_rows, features=features, config=config)
     plt.figure(figsize=(6, 4))
     order = np.argsort(test_probabilities)
     rolling = pd.Series(y_test.to_numpy()[order]).groupby(np.arange(len(y_test)) // max(1, len(y_test) // 10)).mean()
