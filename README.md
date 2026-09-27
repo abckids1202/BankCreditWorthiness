@@ -63,7 +63,7 @@ The endpoint validates that the feature map exactly matches the trained schema a
 
 Policy experiments can be run without changing the configured automatic policy through `POST /policy/simulate`. Submit a list of probabilities, approval/decline thresholds, and optionally known outcomes; the response reports approval, review, and decline rates plus observed default rates when labels are supplied. This is a research simulator, not a live policy override.
 
-Input drift can be checked with `POST /monitoring/drift`. Submit reference records, current records, and optionally a feature list. The endpoint calculates PSI and missingness deltas, classifies each feature as `ok`, `warning`, or `critical`, counts current values outside the reference range, rejects explicitly requested features missing from either dataset, and recommends investigation. It never retrains automatically.
+Input drift can be checked with `POST /monitoring/drift`. Submit reference records, current records, and optionally a feature list. The endpoint calculates PSI and missingness deltas, classifies each feature as `ok`, `warning`, or `critical` using both signals, reports the severity reasons, counts current values outside the reference range, rejects explicitly requested features missing from either dataset, and recommends investigation. It never retrains automatically.
 
 The primary model artifact also stores training-distribution statistics for engineered features. At prediction time, inputs exceeding the configured `out_of_distribution_z` threshold are routed to `manual_review` with a warning instead of being silently treated as ordinary applicants.
 
