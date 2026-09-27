@@ -25,3 +25,8 @@ def group_metrics(frame, y_true, probabilities, protected_columns, approve_max_r
                 if group != reference:
                     report[column + "_comparisons"][group] = {"reference_group": reference, "approval_rate_difference": values["approval_rate"] - base["approval_rate"], "approval_rate_ratio": values["approval_rate"] / max(base["approval_rate"], 1e-9), "equal_opportunity_difference": values["true_positive_rate"] - base["true_positive_rate"], "false_positive_rate_difference": values["false_positive_rate"] - base["false_positive_rate"], "false_negative_rate_difference": values["false_negative_rate"] - base["false_negative_rate"], "calibration_error_difference": values["calibration_error"] - base["calibration_error"]}
     return report
+
+
+def threshold_sensitivity(frame, y_true, probabilities, protected_columns, threshold_pairs):
+    """Run the same group audit across policy threshold pairs."""
+    return [{"approve_max_risk": float(approve), "decline_min_risk": float(decline), "metrics": group_metrics(frame, y_true, probabilities, protected_columns, approve, decline)} for approve, decline in threshold_pairs]
