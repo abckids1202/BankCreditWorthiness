@@ -12,6 +12,8 @@ def test_generic_trainer_handles_mixed_schema(tmp_path):
     assert (tmp_path / "artifact" / "model.joblib").exists()
     assert (tmp_path / "artifact" / "versions" / metadata["artifact_fingerprint"] / "model.joblib").exists()
     assert (tmp_path / "artifact" / "versions" / metadata["artifact_fingerprint"] / "metadata.json").exists()
+    assert (tmp_path / "artifact" / "training_report.json").exists()
+    assert metadata["dataset_summary"]["default_rate"] == 0.5
     assert metadata["metrics_test"]["roc_auc"] >= 0
 
 
