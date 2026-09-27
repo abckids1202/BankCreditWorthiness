@@ -63,16 +63,39 @@ class DatasetAdapter:
 
 class UCIDefaultAdapter(DatasetAdapter):
     name = "uci_default"
+    SOURCE_METADATA = {
+        "source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients",
+        "license": "CC BY 4.0",
+        "citation": "Yeh and Lien (2009), The comparisons of data mining techniques for the predictive accuracy of probability of default of credit card clients",
+        "target_definition": "Default payment in the following month",
+        "prediction_horizon": "One month after the six-month observation history",
+        "row_definition": "Existing credit-card client",
+        "missing_value_behavior": "Missing values are retained for quality checks and median-imputed inside the fitted pipeline",
+        "known_limitations": "Historical Taiwanese credit-card customers; not a new-loan application population and not a causal fairness benchmark",
+        "protected_attribute_notes": "SEX, EDUCATION, MARRIAGE, and AGE are retained for audit only",
+    }
 
     def load(self, raw_dir: str | Path = "data/raw") -> DatasetBundle:
         frame = load_uci_data(raw_dir)
-        bundle = DatasetBundle(name=self.name, frame=frame, target="default", protected_attributes=["SEX", "EDUCATION", "MARRIAGE", "AGE"], feature_columns=[column for column in frame.columns if column not in {"default", "ID", "SEX", "EDUCATION", "MARRIAGE", "AGE"}], metadata={"source_url": "https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients", "license": "CC BY 4.0", "target_definition": "Default payment in the following month", "row_definition": "Existing credit-card client"})
+        bundle = DatasetBundle(name=self.name, frame=frame, target="default", protected_attributes=["SEX", "EDUCATION", "MARRIAGE", "AGE"], feature_columns=[column for column in frame.columns if column not in {"default", "ID", "SEX", "EDUCATION", "MARRIAGE", "AGE"}], metadata=dict(self.SOURCE_METADATA))
         self.validate(bundle); return bundle
 
 
 class GermanCreditAdapter(DatasetAdapter):
     name = "german_credit"
     URL = "https://archive.ics.uci.edu/static/public/144/statlog+german+credit+data.zip"
+    SOURCE_METADATA = {
+        "source_url": "https://archive.ics.uci.edu/dataset/144/statlog%2Bgerman%2Bcredit%2Bdata",
+        "license": "CC BY 4.0",
+        "citation": "UCI Statlog (German Credit) dataset",
+        "target_definition": "Bad credit risk according to the dataset label",
+        "prediction_horizon": "Not specified by the source dataset",
+        "row_definition": "Credit application",
+        "missing_value_behavior": "The source file is encoded without blank fields; the pipeline still validates and imputes missing values if introduced",
+        "known_limitations": "Small historical application sample, encoded categories, and an ambiguous target-cost context; not a modern lending population",
+        "protected_attribute_notes": "personal_status_sex and age are retained for audit only",
+        "cost_matrix": "Misclassifying bad credit as good has higher cost",
+    }
     COLUMNS = ["checking_status", "duration_months", "credit_history", "purpose", "credit_amount", "savings_status", "employment_since", "installment_rate", "personal_status_sex", "other_debtors", "residence_since", "property_status", "age", "other_installment_plans", "housing", "existing_credits", "job", "dependents", "telephone", "foreign_worker", "credit_risk"]
 
     @classmethod
@@ -90,13 +113,24 @@ class GermanCreditAdapter(DatasetAdapter):
         frame = self.parse(data_path)
         protected = ["personal_status_sex", "age"]
         features = [column for column in frame.columns if column not in {"credit_risk", *protected}]
-        bundle = DatasetBundle(name=self.name, frame=frame, target="credit_risk", protected_attributes=protected, feature_columns=features, metadata={"source_url": "https://archive.ics.uci.edu/dataset/144/statlog%2Bgerman%2Bcredit%2Bdata", "license": "CC BY 4.0", "target_definition": "Bad credit risk according to the dataset label", "row_definition": "Credit application", "cost_matrix": "Misclassifying bad credit as good has higher cost"})
+        bundle = DatasetBundle(name=self.name, frame=frame, target="credit_risk", protected_attributes=protected, feature_columns=features, metadata=dict(self.SOURCE_METADATA))
         self.validate(bundle); return bundle
 
 
 class GiveMeSomeCreditAdapter(DatasetAdapter):
     name = "give_me_some_credit"
     URL = "https://www.kaggle.com/c/GiveMeSomeCredit/data"
+    SOURCE_METADATA = {
+        "source_url": URL,
+        "license": "Kaggle competition terms; verify current terms before reuse",
+        "citation": "Give Me Some Credit Kaggle competition dataset",
+        "target_definition": "Serious delinquency 90 days or worse within two years",
+        "prediction_horizon": "Two years after the applicant record",
+        "row_definition": "Applicant record",
+        "missing_value_behavior": "MonthlyIncome and NumberOfDependents may be missing; missingness is reported and imputed inside the fitted pipeline",
+        "known_limitations": "Competition data provenance and selection process are limited; age and other variables may encode protected or proxy information",
+        "protected_attribute_notes": "age is retained for audit only",
+    }
 
     def load(self, raw_dir: str | Path = "data/raw") -> DatasetBundle:
         path = Path(raw_dir) / "cs-training.csv"
@@ -108,7 +142,7 @@ class GiveMeSomeCreditAdapter(DatasetAdapter):
         frame = frame.rename(columns={"SeriousDlqin2yrs": "default"})
         protected = ["age"]
         features = [column for column in frame.columns if column not in {"default", "Unnamed: 0", *protected}]
-        bundle = DatasetBundle(name=self.name, frame=frame, target="default", protected_attributes=protected, feature_columns=features, metadata={"source_url": self.URL, "license": "Kaggle competition terms", "target_definition": "Serious delinquency 90 days or worse within two years", "row_definition": "Applicant record"})
+        bundle = DatasetBundle(name=self.name, frame=frame, target="default", protected_attributes=protected, feature_columns=features, metadata=dict(self.SOURCE_METADATA))
         self.validate(bundle); return bundle
 
 

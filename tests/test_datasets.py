@@ -6,6 +6,9 @@ from credit_simulator.datasets import ADAPTERS, DatasetBundle, DatasetAdapter, G
 
 def test_dataset_registry_contains_three_adapters():
     assert set(ADAPTERS) == {"uci_default", "german_credit", "give_me_some_credit"}
+    required_metadata = {"source_url", "license", "citation", "target_definition", "prediction_horizon", "row_definition", "missing_value_behavior", "known_limitations", "protected_attribute_notes"}
+    for adapter in ADAPTERS.values():
+        assert required_metadata.issubset(adapter.SOURCE_METADATA)
 
 
 def test_german_parser_normalizes_target(tmp_path):
