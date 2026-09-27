@@ -178,11 +178,15 @@ def predict(applicant: Applicant, request: Request):
     features = metadata["feature_names"]
     try:
         probability = float(np.clip(model.predict_proba(frame[features])[:, 1][0], 1e-6, 1 - 1e-6))
-        outlier = bool((frame.abs() > 1e9).any(axis=None))
+        z_values = []
+        for feature, stats in metadata.get("feature_stats", {}).items():
+            if feature in frame and np.isfinite(frame[feature].iloc[0]):
+                z_values.append(abs(float(frame[feature].iloc[0]) - stats["mean"]) / max(stats["std"], 1e-9))
+        outlier = bool(z_values and max(z_values) > metadata["thresholds"].get("out_of_distribution_z", 5.0)) or bool((frame.abs() > 1e9).any(axis=None))
         decision = decide(probability, out_of_distribution=outlier, **{key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")})
     except (KeyError, ValueError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    warnings = ["Input contains an extreme value and was routed to review"] if outlier else []
+    warnings = ["Input is outside the training distribution and was routed to review"] if outlier else []
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
     score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
     prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None))
