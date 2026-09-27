@@ -107,8 +107,9 @@ class ReviewStore:
             exists = connection.execute("SELECT 1 FROM review_cases WHERE case_id = ?", (case_id,)).fetchone()
             if not exists:
                 return None
-            connection.execute("UPDATE review_cases SET reviewer_decision = COALESCE(?, reviewer_decision), reviewer_note = COALESCE(?, reviewer_note), reviewer_id = COALESCE(?, reviewer_id), reviewed_at = ?, updated_at = ? WHERE case_id = ?", (reviewer_decision, reviewer_note, reviewer_id, now if reviewer_decision else None, now, case_id))
-            if reviewer_decision is not None or reviewer_note is not None or reviewer_id is not None:
+            has_review_update = reviewer_decision is not None or reviewer_note is not None or reviewer_id is not None
+            connection.execute("UPDATE review_cases SET reviewer_decision = COALESCE(?, reviewer_decision), reviewer_note = COALESCE(?, reviewer_note), reviewer_id = COALESCE(?, reviewer_id), reviewed_at = COALESCE(reviewed_at, ?), updated_at = ? WHERE case_id = ?", (reviewer_decision, reviewer_note, reviewer_id, now if has_review_update else None, now, case_id))
+            if has_review_update:
                 connection.execute(
                     "INSERT INTO review_events (event_id, case_id, event_type, created_at, reviewer_decision, reviewer_note, reviewer_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (str(uuid.uuid4()), case_id, "updated", now, reviewer_decision, reviewer_note, reviewer_id),

@@ -13,11 +13,17 @@ def test_review_case_preserves_model_decision(tmp_path):
     assert updated["automatic_decision"] == "manual_review"
     assert updated["reviewer_decision"] == "approved"
     assert updated["reviewer_id"] == "reviewer-demo"
+    first_reviewed_at = updated["reviewed_at"]
+    assert first_reviewed_at
+    note_only = store.update(case["case_id"], None, "Additional context", "reviewer-demo")
+    assert note_only["reviewed_at"] == first_reviewed_at
+    assert note_only["reviewer_decision"] == "approved"
     events = store.history(case["case_id"])
-    assert len(events) == 2
+    assert len(events) == 3
     assert events[1]["reviewer_decision"] == "approved"
     assert events[1]["reviewer_note"] == "Reviewed for prototype"
     assert events[1]["reviewer_id"] == "reviewer-demo"
+    assert events[2]["reviewer_note"] == "Additional context"
 
 
 def test_review_history_missing_case_returns_none(tmp_path):
