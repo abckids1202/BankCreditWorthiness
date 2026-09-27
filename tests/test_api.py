@@ -60,6 +60,17 @@ def test_request_schemas_reject_unknown_fields():
         api.ReviewUpdate.model_validate({"reviewer_note": "test", "unexpected": True})
 
 
+def test_explanation_schema_is_typed_and_rejects_invalid_values():
+    valid = api.Explanation(feature="late_payment_count", description="Late payments", value=3, direction="increased_risk", importance=0.21, explanation_method="local_feature_ablation")
+    assert valid.value == 3
+    with pytest.raises(ValueError):
+        api.Explanation(feature="late_payment_count", description="Late payments", direction="unknown", importance=0.21, explanation_method="local_feature_ablation")
+    with pytest.raises(ValueError):
+        api.Explanation(feature="late_payment_count", description="Late payments", direction="increased_risk", importance=-1, explanation_method="local_feature_ablation")
+    with pytest.raises(ValueError):
+        api.Explanation(feature="late_payment_count", description="Late payments", direction="increased_risk", importance=0.21, explanation_method="local_feature_ablation", extra_field=True)
+
+
 def test_ready_endpoint():
     response = TestClient(app).get("/ready")
     assert response.status_code == 200

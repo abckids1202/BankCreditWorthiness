@@ -88,6 +88,16 @@ class Applicant(BaseModel):
     PAY_AMT4: FiniteFloat = Field(ge=0); PAY_AMT5: FiniteFloat = Field(ge=0); PAY_AMT6: FiniteFloat = Field(ge=0)
 
 
+class Explanation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    feature: str
+    description: str
+    value: FiniteFloat | None = None
+    direction: Literal["increased_risk", "reduced_risk"]
+    importance: FiniteFloat = Field(ge=0)
+    explanation_method: Literal["linear_coefficient_contribution", "local_feature_ablation"]
+
+
 class Prediction(BaseModel):
     risk_probability: FiniteFloat = Field(ge=0, le=1)
     default_probability: FiniteFloat = Field(ge=0, le=1)
@@ -99,7 +109,7 @@ class Prediction(BaseModel):
     model_version: str
     policy_version: str
     reason_codes: list[str]
-    explanations: list[dict]
+    explanations: list[Explanation]
     warnings: list[str]
     educational_disclaimer: str
     experiment_id: str = "unknown"
