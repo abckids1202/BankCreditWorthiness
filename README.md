@@ -71,7 +71,7 @@ The training report also includes detailed fairness comparisons by audit group: 
 
 Project governance and design documentation is available in `docs/`: `model_card.md`, `data_card.md`, `decision_policy.md`, `fairness_report.md`, and `architecture.md`. GitHub Actions runs the test suite on pushes and pull requests. Docker API containers expose a health check, and the dashboard waits for the API health check in Compose.
 
-The API also exposes `GET /ready` for artifact readiness separately from `GET /health` process liveness. Every response includes an `X-Request-ID`; clients may provide their own ID for tracing, and the API logs method, path, status, and duration.
+The API also exposes `GET /ready` for artifact readiness separately from `GET /health` process liveness. Readiness verifies that the serialized model, prediction interface, and required metadata can be loaded; invalid or corrupt artifacts return `503` rather than being treated as ready. Every response includes an `X-Request-ID`; clients may provide their own ID for tracing, and the API logs method, path, status, and duration.
 
 For non-local use, set `CREDIT_API_KEY` in the service environment. Protected endpoints then require the matching `X-API-Key` header. Health, readiness, and API documentation routes remain public for operational checks. Leave the variable unset for the default local-development workflow.
 

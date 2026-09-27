@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+import credit_simulator.api as api
 from credit_simulator.api import app
 
 
@@ -19,6 +20,14 @@ def test_ready_endpoint():
     response = TestClient(app).get("/ready")
     assert response.status_code == 200
     assert response.json()["status"] == "ready"
+
+
+def test_ready_endpoint_reports_invalid_artifacts(monkeypatch, tmp_path):
+    (tmp_path / "model.joblib").write_bytes(b"not-a-model")
+    (tmp_path / "metadata.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(api, "ARTIFACT_DIR", tmp_path)
+    response = TestClient(app).get("/ready")
+    assert response.status_code == 503
 
 
 def test_prediction_stats_do_not_store_raw_inputs():

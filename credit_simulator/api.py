@@ -133,7 +133,15 @@ def _artifacts():
     model_path, metadata_path = ARTIFACT_DIR / "model.joblib", ARTIFACT_DIR / "metadata.json"
     if not model_path.exists() or not metadata_path.exists():
         raise HTTPException(503, "Model artifacts are unavailable. Run: python scripts/train.py")
-    return joblib.load(model_path), json.loads(metadata_path.read_text(encoding="utf-8"))
+    try:
+        model = joblib.load(model_path)
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        required = {"model_version", "feature_names", "thresholds", "score", "risk_bands"}
+        if not isinstance(metadata, dict) or not required.issubset(metadata) or not hasattr(model, "predict_proba"):
+            raise ValueError("missing required model metadata or prediction interface")
+        return model, metadata
+    except Exception as exc:
+        raise HTTPException(503, "Model artifacts could not be loaded; retrain or restore a valid artifact") from exc
 
 
 def _dataset_artifacts(dataset: str):
