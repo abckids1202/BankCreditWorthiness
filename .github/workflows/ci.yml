@@ -16,3 +16,5 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: python scripts/train.py
       - run: pytest -q
+      - run: docker compose config --quiet
+      - run: docker build --tag bank-credit-worth:test .
