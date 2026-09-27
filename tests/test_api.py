@@ -1,5 +1,8 @@
 from fastapi.testclient import TestClient
 import json
+import hashlib
+import joblib
+import numpy as np
 import pytest
 
 import credit_simulator.api as api
@@ -142,6 +145,20 @@ def test_optional_rate_limit(monkeypatch):
 def test_unknown_alternate_dataset_is_rejected():
     response = TestClient(app).post("/predict/not_a_dataset", json={"features": {}})
     assert response.status_code == 404
+
+
+def test_alternate_artifact_requires_complete_manifest(monkeypatch, tmp_path):
+    from sklearn.dummy import DummyClassifier
+
+    model = DummyClassifier(strategy="prior").fit(np.array([[0.0]]), np.array([0]))
+    dataset_dir = tmp_path / "german_credit"
+    dataset_dir.mkdir()
+    model_path = dataset_dir / "model.joblib"
+    joblib.dump(model, model_path)
+    (dataset_dir / "metadata.json").write_text(json.dumps({"model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest()}), encoding="utf-8")
+    monkeypatch.setattr(api, "ARTIFACT_DIR", tmp_path)
+    with pytest.raises(Exception):
+        api._dataset_artifacts("german_credit")
 
 
 def test_policy_simulation_endpoint():

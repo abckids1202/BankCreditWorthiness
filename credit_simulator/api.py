@@ -227,8 +227,9 @@ def _dataset_artifacts(dataset: str):
         model = joblib.load(model_path)
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         checksum = hashlib.sha256(model_path.read_bytes()).hexdigest()
-        if not isinstance(metadata, dict) or metadata.get("model_sha256") != checksum or not hasattr(model, "predict_proba"):
-            raise ValueError("missing or mismatched alternate model checksum")
+        required = {"model_sha256", "model_version", "feature_names", "disclaimer", "dataset", "policy_version"}
+        if not isinstance(metadata, dict) or not required.issubset(metadata) or metadata["model_sha256"] != checksum or not hasattr(model, "predict_proba"):
+            raise ValueError("missing required alternate model metadata or prediction interface")
         return model, metadata
     except Exception as exc:
         raise HTTPException(503, f"Artifacts for {dataset} failed integrity validation; retrain the dataset model") from exc
