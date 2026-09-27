@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -27,5 +28,14 @@ def test_tree_reasons_are_deterministic_local_effects_and_exclude_protected_fiel
     assert all(set(reason) >= {"feature", "description", "value", "direction", "importance"} for reason in first)
     assert all(reason["feature"] in applicant.columns for reason in first)
     assert all(reason["direction"] in {"increased_risk", "reduced_risk"} for reason in first)
+    assert all(reason["explanation_method"] == "local_feature_ablation" for reason in first)
     assert all("SEX" not in reason["feature"] for reason in first)
     assert len(reason_codes(model, applicant, list(training.columns))) == 2
+
+
+def test_explanations_reject_protected_features():
+    training = pd.DataFrame({"utilization": [0.05, 0.1, 0.8, 0.9], "late_payment_count": [0, 0, 3, 4]})
+    model = Pipeline([("imputer", SimpleImputer(strategy="median")), ("model", HistGradientBoostingClassifier(max_iter=10, random_state=7))]).fit(training, [0, 0, 1, 1])
+    applicant = training.iloc[[0]].copy()
+    with pytest.raises(ValueError, match="Protected attributes"):
+        structured_reasons(model, applicant, list(training.columns), protected_features=["utilization"])

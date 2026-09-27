@@ -49,8 +49,11 @@ def _local_ablation_effects(model, frame: pd.DataFrame, feature_names: list[str]
     return effects
 
 
-def structured_reasons(model, frame: pd.DataFrame, feature_names: list[str], descriptions: dict[str, str] | None = None, top_n: int = 3) -> list[dict]:
+def structured_reasons(model, frame: pd.DataFrame, feature_names: list[str], descriptions: dict[str, str] | None = None, top_n: int = 3, protected_features: list[str] | None = None) -> list[dict]:
     """Return transparent, directional reasons; these are not adverse-action notices."""
+    protected_overlap = sorted(set(feature_names).intersection(protected_features or []))
+    if protected_overlap:
+        raise ValueError(f"Protected attributes cannot be used in explanations: {protected_overlap}")
     values = frame[feature_names].astype(float).iloc[0].to_numpy()
     imputer = model.named_steps.get("imputer")
     scaler = model.named_steps.get("scaler")
@@ -58,7 +61,8 @@ def structured_reasons(model, frame: pd.DataFrame, feature_names: list[str], des
     transformed = imputer.transform(frame[feature_names])
     if scaler is not None:
         transformed = scaler.transform(transformed)
-    if _has_coefficients(estimator):
+    coefficient_based = _has_coefficients(estimator)
+    if coefficient_based:
         contributions = np.nan_to_num(transformed[0]) * _feature_effect_vector(estimator, len(feature_names))
     else:
         contributions = _local_ablation_effects(model, frame, feature_names)
@@ -66,10 +70,10 @@ def structured_reasons(model, frame: pd.DataFrame, feature_names: list[str], des
     descriptions = descriptions or {}
     reasons = []
     for index in ranked:
-        reasons.append({"feature": feature_names[index], "description": descriptions.get(feature_names[index], feature_names[index]), "value": None if pd.isna(values[index]) else float(values[index]), "direction": "increased_risk" if contributions[index] > 0 else "reduced_risk", "importance": float(abs(contributions[index]))})
+        reasons.append({"feature": feature_names[index], "description": descriptions.get(feature_names[index], feature_names[index]), "value": None if pd.isna(values[index]) else float(values[index]), "direction": "increased_risk" if contributions[index] > 0 else "reduced_risk", "importance": float(abs(contributions[index])), "explanation_method": "linear_coefficient_contribution" if coefficient_based else "local_feature_ablation"})
     return reasons
 
 
-def reason_codes(model, frame: pd.DataFrame, feature_names: list[str], top_n: int = 3) -> list[str]:
-    return [f"{reason['feature']} {'increased' if reason['direction'] == 'increased_risk' else 'reduced'} the modeled default risk" for reason in structured_reasons(model, frame, feature_names, top_n=top_n)]
+def reason_codes(model, frame: pd.DataFrame, feature_names: list[str], top_n: int = 3, protected_features: list[str] | None = None) -> list[str]:
+    return [f"{reason['feature']} {'increased' if reason['direction'] == 'increased_risk' else 'reduced'} the modeled default risk" for reason in structured_reasons(model, frame, feature_names, top_n=top_n, protected_features=protected_features)]
 
