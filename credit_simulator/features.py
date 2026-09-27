@@ -8,6 +8,7 @@ MONTHS = [1, 2, 3, 4, 5, 6]
 PAY_COLUMNS = [f"PAY_{month}" if month != 1 else "PAY_0" for month in MONTHS]
 BILL_COLUMNS = [f"BILL_AMT{month}" for month in MONTHS]
 PAY_AMT_COLUMNS = [f"PAY_AMT{month}" for month in MONTHS]
+RAW_FEATURE_COLUMNS = ["LIMIT_BAL", *PAY_COLUMNS, *BILL_COLUMNS, *PAY_AMT_COLUMNS]
 
 
 def _slope(values: np.ndarray) -> np.ndarray:
@@ -25,9 +26,13 @@ def engineer_features(frame: pd.DataFrame) -> pd.DataFrame:
     the six historical months available at scoring time and do not use the target.
     """
     result = frame.copy()
-    missing = [column for column in ["LIMIT_BAL", *PAY_COLUMNS, *BILL_COLUMNS, *PAY_AMT_COLUMNS] if column not in result]
+    missing = [column for column in RAW_FEATURE_COLUMNS if column not in result]
     if missing:
         raise ValueError(f"Missing raw feature columns: {missing}")
+
+    for column in RAW_FEATURE_COLUMNS:
+        result[f"{column}_missing"] = result[column].isna().astype(int)
+    result["missing_value_count"] = result[RAW_FEATURE_COLUMNS].isna().sum(axis=1).astype(int)
 
     bills = result[BILL_COLUMNS].to_numpy(dtype=float)
     payments = result[PAY_AMT_COLUMNS].to_numpy(dtype=float)
@@ -97,4 +102,6 @@ def engineered_feature_descriptions() -> dict[str, str]:
         "active_month_count": "Number of months with a non-zero bill",
         "zero_payment_month_count": "Number of months with no payment",
         "zero_balance_month_count": "Number of months with zero balance",
+        **{f"{column}_missing": f"Indicator that raw field {column} was missing at scoring time" for column in RAW_FEATURE_COLUMNS},
+        "missing_value_count": "Number of missing raw fields at scoring time",
     }
