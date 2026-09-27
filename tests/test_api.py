@@ -21,6 +21,12 @@ def test_ready_endpoint():
     assert response.json()["status"] == "ready"
 
 
+def test_prediction_stats_do_not_store_raw_inputs():
+    response = TestClient(app).get("/prediction-stats")
+    assert response.status_code == 200
+    assert response.json()["raw_inputs_stored"] is False
+
+
 def test_optional_api_key(monkeypatch):
     monkeypatch.setenv("CREDIT_API_KEY", "test-secret")
     client = TestClient(app)

@@ -11,7 +11,7 @@ from typing import Any
 import joblib
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,10 +23,12 @@ from .review import ReviewStore
 from .datasets import ADAPTERS
 from .monitoring import drift_report
 from .registry import list_models
+from .predictions import PredictionEventStore
 
 
 ARTIFACT_DIR = Path("artifacts")
 review_store = ReviewStore()
+prediction_store = PredictionEventStore()
 app = FastAPI(title="Explainable Credit Approval Simulator", version="0.1.0", description="Educational prototype only; not for real lending decisions.")
 logger = logging.getLogger("credit_simulator.api")
 
@@ -34,6 +36,7 @@ logger = logging.getLogger("credit_simulator.api")
 @app.middleware("http")
 async def request_context(request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
     started = time.perf_counter()
     configured_key = os.getenv("CREDIT_API_KEY")
     public_paths = {"/health", "/ready", "/docs", "/openapi.json", "/redoc"}
@@ -151,8 +154,13 @@ def models():
     return {"models": list_models()}
 
 
+@app.get("/prediction-stats")
+def prediction_stats():
+    return prediction_store.summary()
+
+
 @app.post("/predict", response_model=Prediction)
-def predict(applicant: Applicant):
+def predict(applicant: Applicant, request: Request):
     model, metadata = _artifacts()
     payload = applicant.model_dump()
     raw_features = metadata.get("raw_feature_names", metadata["feature_names"])
@@ -167,7 +175,9 @@ def predict(applicant: Applicant):
         raise HTTPException(422, str(exc)) from exc
     warnings = ["Input contains an extreme value and was routed to review"] if outlier else []
     explanations = structured_reasons(model, frame, features, metadata.get("feature_descriptions"))
-    return Prediction(risk_probability=probability, credit_score=probability_to_score(probability, metadata["score"]), risk_band=risk_band(probability, metadata["risk_bands"]), decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
+    score = probability_to_score(probability, metadata["score"]); band = risk_band(probability, metadata["risk_bands"])
+    prediction_store.record("uci_default", metadata["model_version"], probability, score, band, decision.decision, getattr(request.state, "request_id", None))
+    return Prediction(risk_probability=probability, credit_score=score, risk_band=band, decision=decision.decision, rationale=decision.rationale, decision_thresholds={key: metadata["thresholds"][key] for key in ("approve_max_risk", "decline_min_risk")}, model_version=metadata["model_version"], reason_codes=reason_codes(model, frame, features), explanations=explanations, warnings=warnings, educational_disclaimer=metadata["disclaimer"])
 
 
 @app.post("/predict/{dataset}", response_model=DatasetPrediction)
@@ -187,8 +197,8 @@ def predict_alternate(dataset: str, request: DatasetPredictionRequest):
 
 
 @app.post("/review-cases")
-def create_review_case(applicant: Applicant):
-    prediction = predict(applicant).model_dump()
+def create_review_case(applicant: Applicant, request: Request):
+    prediction = predict(applicant, request).model_dump()
     return review_store.create(applicant.model_dump(), prediction)
 
 
