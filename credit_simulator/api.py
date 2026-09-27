@@ -7,7 +7,7 @@ import os
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import joblib
 import numpy as np
@@ -275,8 +275,8 @@ def get_review_case(case_id: str):
 
 
 class ReviewUpdate(BaseModel):
-    reviewer_decision: str | None = None
-    reviewer_note: str | None = None
+    reviewer_decision: Literal["approved", "declined", "needs_more_information", "escalated"] | None = None
+    reviewer_note: str | None = Field(default=None, max_length=5000)
 
 
 @app.patch("/review-cases/{case_id}")
