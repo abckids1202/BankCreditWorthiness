@@ -40,3 +40,16 @@ def test_generic_trainer_rejects_non_binary_target(tmp_path):
     bundle = DatasetBundle("synthetic", frame, "default", [], ["income"], {"source_url": "test"})
     with pytest.raises(ValueError, match="binary"):
         train_tabular(bundle, tmp_path / "artifact")
+
+
+def test_generic_trainer_uses_temporal_split_when_adapter_declares_time_column(tmp_path):
+    frame = pd.DataFrame({
+        "application_date": pd.date_range("2024-01-01", periods=20, freq="D"),
+        "income": list(range(20)),
+        "default": [0, 1] * 10,
+    })
+    bundle = DatasetBundle("temporal", frame, "default", [], ["income"], {"source_url": "test", "time_column": "application_date"})
+    metadata = train_tabular(bundle, tmp_path / "artifact")
+    assert metadata["split_strategy"] == "temporal"
+    assert metadata["dataset_summary"]["validation_rows"] == 4
+    assert metadata["dataset_summary"]["test_rows"] == 4
