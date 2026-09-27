@@ -33,6 +33,7 @@ def test_registry_reports_artifact_integrity(tmp_path):
     (artifact / "metadata.json").write_text(json.dumps({"model_sha256": checksum}), encoding="utf-8")
     register_model({"dataset": "test", "model_version": "2", "model_sha256": checksum}, artifact, path)
     listed = list_models(path)[0]
+    assert listed["model_sha256"] == checksum
     assert listed["artifact_available"] is True
     assert listed["checksum_valid"] is True
     model.write_bytes(b"changed")
