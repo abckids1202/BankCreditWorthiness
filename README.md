@@ -27,6 +27,8 @@ Training also creates utilization, repayment-delay, payment-ratio, balance-trend
 
 Each primary training run gets a reproducible version such as `0.3.0+8c1b78222395`. The fingerprint is derived from the dataset hash, selected model, and training configuration, so changing any of those inputs creates a distinguishable artifact version. The full training configuration is also stored in `artifacts/metadata.json` and `outputs/reports/training_report.json` for experiment reconstruction.
 
+To run a reproducible experiment with a separate policy/model configuration, copy `configs/default.yaml`, edit the copy, and pass it explicitly: `python scripts/train.py --config configs/my_experiment.yaml --output-dir artifacts/my_experiment`. The resulting fingerprint records the supplied configuration.
+
 The threshold CSV evaluates precision, recall, false-positive rate, and false-negative rate at each tested decline threshold, alongside approval/review/decline population rates, default rates by decision group, and configurable expected cost. The approval-rate report separately evaluates default precision and recall when approving the lowest-risk 50%, 70%, 80%, and 90% of the held-out population; these are diagnostic operating points, not recommended lending cutoffs.
 
 Supported dataset adapters can be profiled with:
